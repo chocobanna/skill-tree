@@ -683,6 +683,9 @@
     if (!node.allocated) {
 
       if (!canAllocate(id)) return;
+
+      if (exclusiveBlocked(node)) return;
+
       if (!requirementsMet(node)) return;
 
       const cost = node.requirements?.points || 0;
@@ -829,14 +832,31 @@
     }
   }
 
-  function nodeIsDim(node, distances){
+  function exclusiveBlocked(node){
 
+    if(!node.exclusiveGroup) return false;
+
+    for(const n of data.nodes){
+
+      if(n.id === node.id) continue;
+
+      if(n.exclusiveGroup === node.exclusiveGroup && n.allocated){
+        return true;
+      }
+
+    }
+
+    return false;
+  }
+
+  function nodeIsDim(node, distances){
+    const exclusiveFail = exclusiveBlocked(node);
     const d = distances[node.id];
 
     const tooFar = (d === undefined || d > 1);
     const reqFail = !requirementsMet(node) && !node.allocated;
 
-    return tooFar || reqFail;
+    return tooFar || reqFail || exclusiveFail;
   }
 
   function requirementsMet(node){

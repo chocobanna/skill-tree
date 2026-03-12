@@ -554,6 +554,11 @@
       <button id="addReqAttrBtn">Add</button>
     </div>
 
+    <hr>
+
+    <h3>EXCLUSIVE GROUP</h3>
+    <input id="propExclusiveGroup" type="text" placeholder="group id (optional)">
+
     </div>
 
     <div id="ringPropertiesUI">
@@ -690,6 +695,7 @@
     exportBtn: document.getElementById("exportBtn"),
     importBtn: document.getElementById("importBtn"),
 
+    propExclusiveGroup: document.getElementById("propExclusiveGroup"),
     propName: document.getElementById("propName"),
     propDesc: document.getElementById("propDesc"),
     propType: document.getElementById("propType"),
@@ -1124,6 +1130,7 @@
     els.propName.value = node.name || "";
     els.propDesc.value = node.desc || "";
     els.propType.value = node.type || "normal";
+    els.propExclusiveGroup.value = node.exclusiveGroup || "";
     els.propOrbitType.value = node.orbitType || "main";
     els.propAngle.value = Number(node.angleDeg || 0);
     els.propMainRing.value = node.mainRingId || "";
@@ -1176,6 +1183,7 @@
     node.name = els.propName.value;
     node.desc = els.propDesc.value;
     node.type = els.propType.value;
+    node.exclusiveGroup = els.propExclusiveGroup.value || "";
     node.orbitType = els.propOrbitType.value;
     node.mainRingId = els.propMainRing.value;
     node.subRingId = els.propSubRing.value;
