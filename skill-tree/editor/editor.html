@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Skill Tree Editor</title>
+<style>
+  :root{
+    --bg1:#090b11;
+    --bg2:#111624;
+    --panel:rgba(10,14,20,0.94);
+    --panel-border:rgba(255,215,140,0.12);
+    --text:#e8dcc0;
+    --muted:#a89b82;
+    --ring:rgba(180,150,100,0.18);
+    --subring:rgba(100,170,255,0.22);
+    --subanchor:rgba(120,180,255,0.9);
+    --line:rgba(150,140,120,0.22);
+    --line-active:rgba(255,196,92,0.85);
+    --node-fill:#1c2433;
+    --node-stroke:#8b7550;
+    --node-selected:#fff0c6;
+    --start:#5eff9a;
+    --disabled:0.28;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    color:var(--text);
+    font-family:Arial, Helvetica, sans-serif;
+    background:
+      radial-gradient(circle at center, rgba(255,190,80,0.05) 0%, transparent 18%),
+      radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
+  }
+
+  #app{
+    width:100%;
+    height:100%;
+    position:relative;
+  }
+
+  .panel{
+    position:absolute;
+    z-index:10;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.35);
+    backdrop-filter:blur(6px);
+  }
+
+  #toolbar{
+    top:10px;
+    left:10px;
+    width:380px;
+    max-height:calc(100vh - 20px);
+    overflow:auto;
+  }
+
+  #properties{
+    top:10px;
+    right:10px;
+    width:320px;
+    max-height:calc(100vh - 20px);
+    overflow:auto;
+  }
+
+  #ioPanel{
+    position:absolute;
+    left:10px;
+    bottom:10px;
+    width:520px;
+    height:220px;
+    z-index:10;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    padding:10px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.35);
+  }
+
+  #jsonBox{
+    width:100%;
+    height:100%;
+    background:#0b0f16;
+    color:var(--text);
+    border:1px solid rgba(255,215,140,0.12);
+    border-radius:8px;
+    resize:none;
+    outline:none;
+    padding:8px;
+    font-family:Consolas, monospace;
+    font-size:12px;
+  }
+
+  h3{
+    margin:0 0 8px 0;
+    font-size:14px;
+    letter-spacing:0.08em;
+  }
+
+  .row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:end;
+  }
+
+  .row > div, .row > button{
+    flex:1;
+  }
+
+  label{
+    display:block;
+    margin:0 0 4px 0;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  input, select, textarea, button{
+    width:100%;
+    background:linear-gradient(180deg, #1b2331, #101620);
+    color:var(--text);
+    border:1px solid rgba(255,215,140,0.16);
+    border-radius:8px;
+    padding:8px 10px;
+    outline:none;
+  }
+
+  textarea{
+    min-height:84px;
+    resize:vertical;
+  }
+
+  button{
+    cursor:pointer;
+    font-weight:bold;
+  }
+
+  button:hover{
+    filter:brightness(1.08);
+  }
+
+  .activeMode{
+    outline:2px solid rgba(255,240,198,0.7);
+  }
+
+  .mini{
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.35;
+  }
+
+  hr{
+    border:none;
+    border-top:1px solid rgba(255,215,140,0.08);
+    margin:10px 0;
+  }
+
+  svg{
+    width:100%;
+    height:100%;
+    display:block;
+    cursor:grab;
+    user-select:none;
+  }
+
+  svg.dragging{
+    cursor:grabbing;
+  }
+
+  .main-ring{
+    fill:none;
+    stroke:var(--ring);
+    stroke-width:2;
+    stroke-dasharray:4 10;
+  }
+
+  .sub-ring{
+    fill:none;
+    stroke:var(--subring);
+    stroke-width:2;
+    stroke-dasharray:4 8;
+  }
+
+  .sub-link{
+    stroke:rgba(100,170,255,0.20);
+    stroke-width:2;
+    stroke-dasharray:4 8;
+  }
+
+  .sub-anchor{
+    fill:rgba(100,170,255,0.16);
+    stroke:rgba(180,220,255,0.75);
+    stroke-width:2;
+    cursor:pointer;
+  }
+
+  .sub-anchor.selected{
+    stroke:#fff;
+    stroke-width:3;
+  }
+
+  .connection{
+    stroke:var(--line);
+    stroke-width:3;
+    stroke-linecap:round;
+  }
+
+  .connection.selected{
+    stroke:#fff0c6;
+    stroke-width:4;
+  }
+
+  .node{
+    cursor:pointer;
+  }
+
+  .node .outer{
+    fill:rgba(10,12,18,0.95);
+    stroke:rgba(255,213,129,0.18);
+    stroke-width:2;
+  }
+
+  .node .core{
+    fill:var(--node-fill);
+    stroke:var(--node-stroke);
+    stroke-width:2;
+  }
+
+  .node.selected .core{
+    stroke:var(--node-selected);
+    stroke-width:3;
+  }
+
+  .node.start .core{
+    stroke:var(--start);
+  }
+
+  .node.disabled{
+    opacity:var(--disabled);
+  }
+
+  .node-label{
+    fill:#d9ceb6;
+    font-size:11px;
+    text-anchor:middle;
+    pointer-events:none;
+  }
+
+  .status{
+    position:absolute;
+    right:340px;
+    top:10px;
+    z-index:10;
+    background:rgba(10,14,20,0.8);
+    border:1px solid rgba(255,215,140,0.10);
+    border-radius:12px;
+    padding:10px 12px;
+    color:var(--muted);
+    font-size:12px;
+    max-width:260px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="toolbar" class="panel">
+    <h3>EDITOR</h3>
+
+    <div class="row">
+      <button id="modeSelectBtn">Select</button>
+      <button id="modeAddBtn">Add Node</button>
+      <button id="modeConnectBtn">Connect</button>
+    </div>
+
+    <div class="row">
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+      <button id="resetViewBtn">Reset View</button>
+    </div>
+
+    <div class="row">
+      <button id="deleteNodeBtn">Delete Node</button>
+      <button id="deleteSubringBtn">Delete Subring</button>
+      <button id="deleteLinkBtn">Delete Last Link</button>
+    </div>
+
+    <hr>
+
+    <h3>SNAP</h3>
+
+    <div class="row">
+      <div>
+        <label><input id="snapEnabled" type="checkbox" checked style="width:auto; margin-right:6px;">Enable snap</label>
+      </div>
+      <div>
+        <label>Angle snap</label>
+        <select id="angleSnap">
+          <option value="5">5°</option>
+          <option value="10" selected>10°</option>
+          <option value="15">15°</option>
+          <option value="30">30°</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Radius behavior</label>
+        <select id="radiusMode">
+          <option value="strict" selected>Strict orbit</option>
+          <option value="offset">Allow offset</option>
+        </select>
+      </div>
+      <div>
+        <label>Subring anchor snap</label>
+        <select id="subAnchorSnap">
+          <option value="5">5°</option>
+          <option value="10" selected>10°</option>
+          <option value="15">15°</option>
+          <option value="30">30°</option>
+        </select>
+      </div>
+    </div>
+
+    <hr>
+
+    <h3>ADD NODE TARGET</h3>
+
+    <div class="row">
+      <div>
+        <label>Orbit type</label>
+        <select id="addOrbitType">
+          <option value="main">Main ring</option>
+          <option value="sub">Subring</option>
+          <option value="free">Free</option>
+        </select>
+      </div>
+      <div>
+        <label>Node type</label>
+        <select id="addNodeType">
+          <option value="normal">normal</option>
+          <option value="notable">notable</option>
+          <option value="keystone">keystone</option>
+          <option value="start">start</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Main ring</label>
+        <select id="addMainRing"></select>
+      </div>
+      <div>
+        <label>Subring</label>
+        <select id="addSubRing"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Node size</label>
+        <input id="addNodeSize" type="number" value="14" min="4" max="80">
+      </div>
+      <div></div>
+    </div>
+
+    <hr>
+
+    <h3>RINGS</h3>
+
+    <div class="row">
+      <div>
+        <label>Main ring radius</label>
+        <input id="newMainRingRadius" type="number" value="140">
+      </div>
+      <div>
+        <button id="addMainRingBtn">Add Main Ring</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Parent main ring</label>
+        <select id="newSubringParent"></select>
+      </div>
+      <div>
+        <label>Anchor angle</label>
+        <input id="newSubringAngle" type="number" value="0">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Subring radius</label>
+        <input id="newSubringRadius" type="number" value="75">
+      </div>
+      <div>
+        <button id="addSubringBtn">Add Subring</button>
+      </div>
+    </div>
+
+    <div class="mini">
+      Subrings are real circles attached to points on main rings. Drag the blue anchor to move them.
+    </div>
+
+    <hr>
+
+    <div class="row">
+      <button id="exportBtn">Export JSON</button>
+      <button id="importBtn">Import JSON</button>
+    </div>
+  </div>
+
+  <div id="properties" class="panel">
+    <h3>NODE PROPERTIES</h3>
+
+    <label>Name</label>
+    <input id="propName" type="text" placeholder="Node name">
+
+    <label>Description</label>
+    <textarea id="propDesc" placeholder="Node description"></textarea>
+
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select id="propType">
+          <option value="normal">normal</option>
+          <option value="notable">notable</option>
+          <option value="keystone">keystone</option>
+          <option value="start">start</option>
+        </select>
+      </div>
+      <div>
+        <label>Size</label>
+        <input id="propSize" type="number" value="14" min="4" max="80">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Orbit type</label>
+        <select id="propOrbitType">
+          <option value="main">main</option>
+          <option value="sub">sub</option>
+          <option value="free">free</option>
+        </select>
+      </div>
+      <div>
+        <label>Angle</label>
+        <input id="propAngle" type="number" value="0">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Main ring</label>
+        <select id="propMainRing"></select>
+      </div>
+      <div>
+        <label>Subring</label>
+        <select id="propSubRing"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Radius offset</label>
+        <input id="propRadiusOffset" type="number" value="0">
+      </div>
+      <div></div>
+    </div>
+
+    <div class="row">
+      <button id="applyPropsBtn">Apply</button>
+      <button id="resnapBtn">Resnap</button>
+    </div>
+
+    <hr>
+
+    <h3>STARTS</h3>
+
+    <label>Active start</label>
+    <select id="activeStartSelect"></select>
+
+    <div class="mini">
+      You can place multiple start nodes, but once an active start is chosen the others are disabled.
+    </div>
+
+    <hr>
+
+    <h3>SUBRING PROPERTIES</h3>
+
+    <div class="row">
+      <div>
+        <label>Selected subring</label>
+        <select id="selectedSubringSelect"></select>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Parent main ring</label>
+        <select id="subringParentEdit"></select>
+      </div>
+      <div>
+        <label>Anchor angle</label>
+        <input id="subringAngleEdit" type="number" value="0">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Radius</label>
+        <input id="subringRadiusEdit" type="number" value="75">
+      </div>
+      <div>
+        <button id="applySubringBtn">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ioPanel">
+    <textarea id="jsonBox" spellcheck="false"></textarea>
+  </div>
+
+  <div class="status">
+    Select mode: select/drag nodes and subring anchors. Add mode: click to create nodes. Connect mode: click node A then node B.
+  </div>
+
+  <svg id="canvas" viewBox="0 0 1600 1000">
+    <g id="viewport">
+      <g id="ringsLayer"></g>
+      <g id="connectionsLayer"></g>
+      <g id="nodesLayer"></g>
+    </g>
+  </svg>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById("canvas");
+  const viewport = document.getElementById("viewport");
+  const ringsLayer = document.getElementById("ringsLayer");
+  const connectionsLayer = document.getElementById("connectionsLayer");
+  const nodesLayer = document.getElementById("nodesLayer");
+  const jsonBox = document.getElementById("jsonBox");
+
+  const CENTER = { x:800, y:500 };
+
+  const els = {
+    modeSelectBtn: document.getElementById("modeSelectBtn"),
+    modeAddBtn: document.getElementById("modeAddBtn"),
+    modeConnectBtn: document.getElementById("modeConnectBtn"),
+    undoBtn: document.getElementById("undoBtn"),
+    redoBtn: document.getElementById("redoBtn"),
+    resetViewBtn: document.getElementById("resetViewBtn"),
+    deleteNodeBtn: document.getElementById("deleteNodeBtn"),
+    deleteSubringBtn: document.getElementById("deleteSubringBtn"),
+    deleteLinkBtn: document.getElementById("deleteLinkBtn"),
+
+    snapEnabled: document.getElementById("snapEnabled"),
+    angleSnap: document.getElementById("angleSnap"),
+    radiusMode: document.getElementById("radiusMode"),
+    subAnchorSnap: document.getElementById("subAnchorSnap"),
+
+    addOrbitType: document.getElementById("addOrbitType"),
+    addNodeType: document.getElementById("addNodeType"),
+    addMainRing: document.getElementById("addMainRing"),
+    addSubRing: document.getElementById("addSubRing"),
+    addNodeSize: document.getElementById("addNodeSize"),
+
+    newMainRingRadius: document.getElementById("newMainRingRadius"),
+    addMainRingBtn: document.getElementById("addMainRingBtn"),
+    newSubringParent: document.getElementById("newSubringParent"),
+    newSubringAngle: document.getElementById("newSubringAngle"),
+    newSubringRadius: document.getElementById("newSubringRadius"),
+    addSubringBtn: document.getElementById("addSubringBtn"),
+
+    exportBtn: document.getElementById("exportBtn"),
+    importBtn: document.getElementById("importBtn"),
+
+    propName: document.getElementById("propName"),
+    propDesc: document.getElementById("propDesc"),
+    propType: document.getElementById("propType"),
+    propSize: document.getElementById("propSize"),
+    propOrbitType: document.getElementById("propOrbitType"),
+    propAngle: document.getElementById("propAngle"),
+    propMainRing: document.getElementById("propMainRing"),
+    propSubRing: document.getElementById("propSubRing"),
+    propRadiusOffset: document.getElementById("propRadiusOffset"),
+    applyPropsBtn: document.getElementById("applyPropsBtn"),
+    resnapBtn: document.getElementById("resnapBtn"),
+
+    activeStartSelect: document.getElementById("activeStartSelect"),
+
+    selectedSubringSelect: document.getElementById("selectedSubringSelect"),
+    subringParentEdit: document.getElementById("subringParentEdit"),
+    subringAngleEdit: document.getElementById("subringAngleEdit"),
+    subringRadiusEdit: document.getElementById("subringRadiusEdit"),
+    applySubringBtn: document.getElementById("applySubringBtn")
+  };
+
+  let mode = "select";
+  let selectedNodeId = null;
+  let selectedSubringId = null;
+  let connectStartId = null;
+
+  let dragState = null;
+  let panState = { dragging:false, startX:0, startY:0, originX:0, originY:0 };
+  const view = { x:0, y:0, scale:1 };
+
+  let idCounter = 100;
+
+  let data = defaultData();
+  let history = [];
+  let historyIndex = -1;
+
+  function defaultData(){
+    return {
+      mainRings: [
+        { id:"mr1", radius:120 },
+        { id:"mr2", radius:240 },
+        { id:"mr3", radius:360 },
+        { id:"mr4", radius:480 }
+      ],
+      subRings: [
+        { id:"sr1", parentMainRingId:"mr2", anchorAngleDeg:-30, radius:75 }
+      ],
+      nodes: [
+        {
+          id:"n1",
+          name:"Start A",
+          desc:"Primary start",
+          type:"start",
+          size:18,
+          orbitType:"main",
+          mainRingId:"mr1",
+          subRingId:"",
+          angleDeg:-90,
+          radiusOffset:0,
+          x:0, y:0
+        },
+        {
+          id:"n2",
+          name:"Start B",
+          desc:"Alternate start",
+          type:"start",
+          size:18,
+          orbitType:"main",
+          mainRingId:"mr1",
+          subRingId:"",
+          angleDeg:90,
+          radiusOffset:0,
+          x:0, y:0
+        }
+      ],
+      connections: [],
+      activeStartId: "n1"
+    };
+  }
+
+  function deepClone(obj){
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  function saveHistory(){
+    history = history.slice(0, historyIndex + 1);
+    history.push(JSON.stringify(data));
+    historyIndex = history.length - 1;
+  }
+
+  function restoreHistory(idx){
+    if (idx < 0 || idx >= history.length) return;
+    historyIndex = idx;
+    data = JSON.parse(history[historyIndex]);
+    selectedNodeId = null;
+    selectedSubringId = null;
+    populateSelectors();
+    refreshComputedPositions();
+    render();
+  }
+
+  function undo(){ restoreHistory(historyIndex - 1); }
+  function redo(){ restoreHistory(historyIndex + 1); }
+
+  function createSvg(tag){
+    return document.createElementNS("http://www.w3.org/2000/svg", tag);
+  }
+
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function normalizeDeg(d){
+    let v = d % 360;
+    if (v < 0) v += 360;
+    return v;
+  }
+
+  function snapDeg(d, step){
+    return Math.round(d / step) * step;
+  }
+
+  function nodeRadius(type, size){
+    if (typeof size === "number" && !isNaN(size)) return size;
+    if (type === "start") return 18;
+    if (type === "keystone") return 24;
+    if (type === "notable") return 18;
+    return 14;
+  }
+
+  function getMainRing(id){
+    return data.mainRings.find(r => r.id === id) || null;
+  }
+
+  function getSubRing(id){
+    return data.subRings.find(r => r.id === id) || null;
+  }
+
+  function getSubRingCenter(sub){
+    const parent = getMainRing(sub.parentMainRingId);
+    if (!parent) return { x:CENTER.x, y:CENTER.y };
+    const a = degToRad(sub.anchorAngleDeg);
+    return {
+      x: CENTER.x + Math.cos(a) * parent.radius,
+      y: CENTER.y + Math.sin(a) * parent.radius
+    };
+  }
+
+  function computeNodePosition(node){
+    if (node.orbitType === "free") {
+      return { x: node.x, y: node.y };
+    }
+
+    if (node.orbitType === "main") {
+      const ring = getMainRing(node.mainRingId);
+      if (!ring) return { x:CENTER.x, y:CENTER.y };
+      const r = ring.radius + Number(node.radiusOffset || 0);
+      const a = degToRad(node.angleDeg);
+      return {
+        x: CENTER.x + Math.cos(a) * r,
+        y: CENTER.y + Math.sin(a) * r
+      };
+    }
+
+    if (node.orbitType === "sub") {
+      const sub = getSubRing(node.subRingId);
+      if (!sub) return { x:CENTER.x, y:CENTER.y };
+      const c = getSubRingCenter(sub);
+      const r = sub.radius + Number(node.radiusOffset || 0);
+      const a = degToRad(node.angleDeg);
+      return {
+        x: c.x + Math.cos(a) * r,
+        y: c.y + Math.sin(a) * r
+      };
+    }
+
+    return { x:CENTER.x, y:CENTER.y };
+  }
+
+  function refreshComputedPositions(){
+    for (const node of data.nodes) {
+      if (node.orbitType !== "free") {
+        const p = computeNodePosition(node);
+        node.x = p.x;
+        node.y = p.y;
+      }
+    }
+  }
+
+  function screenToSvg(evt){
+    const rect = svg.getBoundingClientRect();
+    const sx = (evt.clientX - rect.left) * (1600 / rect.width);
+    const sy = (evt.clientY - rect.top) * (1000 / rect.height);
+    return {
+      x: (sx - view.x) / view.scale,
+      y: (sy - view.y) / view.scale
+    };
+  }
+
+  function applyTransform(){
+    viewport.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.scale})`);
+  }
+
+  function setMode(m){
+    mode = m;
+    connectStartId = null;
+    els.modeSelectBtn.classList.toggle("activeMode", m === "select");
+    els.modeAddBtn.classList.toggle("activeMode", m === "add");
+    els.modeConnectBtn.classList.toggle("activeMode", m === "connect");
+  }
+
+  function populateSelectors(){
+    const mainTargets = [els.addMainRing, els.newSubringParent, els.propMainRing, els.subringParentEdit];
+    for (const select of mainTargets) {
+      const current = select.value;
+      select.innerHTML = "";
+      for (const ring of data.mainRings) {
+        const opt = document.createElement("option");
+        opt.value = ring.id;
+        opt.textContent = `${ring.id} (${ring.radius})`;
+        select.appendChild(opt);
+      }
+      if ([...select.options].some(o => o.value === current)) select.value = current;
+      else if (select.options.length) select.value = select.options[0].value;
+    }
+
+    const subTargets = [els.addSubRing, els.propSubRing, els.selectedSubringSelect];
+    for (const select of subTargets) {
+      const current = select.value;
+      select.innerHTML = "";
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "(none)";
+      select.appendChild(blank);
+      for (const ring of data.subRings) {
+        const opt = document.createElement("option");
+        opt.value = ring.id;
+        opt.textContent = `${ring.id} (${ring.parentMainRingId} @ ${ring.anchorAngleDeg}°)`;
+        select.appendChild(opt);
+      }
+      if ([...select.options].some(o => o.value === current)) select.value = current;
+      else select.value = "";
+    }
+
+    const active = els.activeStartSelect.value;
+    els.activeStartSelect.innerHTML = "";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "(none)";
+    els.activeStartSelect.appendChild(none);
+    for (const node of data.nodes.filter(n => n.type === "start")) {
+      const opt = document.createElement("option");
+      opt.value = node.id;
+      opt.textContent = node.name || node.id;
+      els.activeStartSelect.appendChild(opt);
+    }
+    els.activeStartSelect.value = data.activeStartId || "";
+    if (active && [...els.activeStartSelect.options].some(o => o.value === active)) {
+      els.activeStartSelect.value = active;
+    }
+
+    if (selectedSubringId) {
+      els.selectedSubringSelect.value = selectedSubringId;
+      loadSubringProperties();
+    }
+  }
+
+  function loadNodeProperties(){
+    const node = data.nodes.find(n => n.id === selectedNodeId);
+    if (!node) return;
+    els.propName.value = node.name || "";
+    els.propDesc.value = node.desc || "";
+    els.propType.value = node.type || "normal";
+    els.propSize.value = node.size ?? nodeRadius(node.type);
+    els.propOrbitType.value = node.orbitType || "main";
+    els.propAngle.value = Number(node.angleDeg || 0);
+    els.propMainRing.value = node.mainRingId || "";
+    els.propSubRing.value = node.subRingId || "";
+    els.propRadiusOffset.value = Number(node.radiusOffset || 0);
+  }
+
+  function applyNodeProperties(){
+    const node = data.nodes.find(n => n.id === selectedNodeId);
+    if (!node) return;
+
+    node.name = els.propName.value;
+    node.desc = els.propDesc.value;
+    node.type = els.propType.value;
+    node.size = Math.max(4, Number(els.propSize.value || 14));
+    node.orbitType = els.propOrbitType.value;
+    node.mainRingId = els.propMainRing.value;
+    node.subRingId = els.propSubRing.value;
+    node.angleDeg = Number(els.propAngle.value || 0);
+    node.radiusOffset = Number(els.propRadiusOffset.value || 0);
+
+    if (els.snapEnabled.checked) {
+      node.angleDeg = snapDeg(node.angleDeg, Number(els.angleSnap.value));
+      if (els.radiusMode.value === "strict") node.radiusOffset = 0;
+    }
+
+    if (node.type === "start" && !data.activeStartId) {
+      data.activeStartId = node.id;
+    }
+    if (node.type !== "start" && data.activeStartId === node.id) {
+      data.activeStartId = "";
+    }
+
+    refreshComputedPositions();
+    populateSelectors();
+    saveHistory();
+    render();
+  }
+
+  function resnapSelectedNode(){
+    const node = data.nodes.find(n => n.id === selectedNodeId);
+    if (!node || node.orbitType === "free") return;
+    node.angleDeg = snapDeg(node.angleDeg, Number(els.angleSnap.value));
+    if (els.radiusMode.value === "strict") node.radiusOffset = 0;
+    const p = computeNodePosition(node);
+    node.x = p.x;
+    node.y = p.y;
+    loadNodeProperties();
+    saveHistory();
+    render();
+  }
+
+  function loadSubringProperties(){
+    const sub = getSubRing(selectedSubringId);
+    if (!sub) return;
+    els.selectedSubringSelect.value = sub.id;
+    els.subringParentEdit.value = sub.parentMainRingId;
+    els.subringAngleEdit.value = Number(sub.anchorAngleDeg || 0);
+    els.subringRadiusEdit.value = Number(sub.radius || 75);
+  }
+
+  function applySubringProperties(){
+    const sub = getSubRing(els.selectedSubringSelect.value);
+    if (!sub) return;
+    sub.parentMainRingId = els.subringParentEdit.value;
+    sub.anchorAngleDeg = Number(els.subringAngleEdit.value || 0);
+    sub.radius = Math.max(10, Number(els.subringRadiusEdit.value || 75));
+    selectedSubringId = sub.id;
+    refreshComputedPositions();
+    populateSelectors();
+    saveHistory();
+    render();
+  }
+
+  function pointToMainOrbit(point, mainRingId, snap){
+    const ring = getMainRing(mainRingId);
+    if (!ring) return { angleDeg:0, radiusOffset:0, x:point.x, y:point.y };
+    const dx = point.x - CENTER.x;
+    const dy = point.y - CENTER.y;
+    let angleDeg = normalizeDeg(Math.atan2(dy, dx) * 180 / Math.PI);
+    if (snap) angleDeg = snapDeg(angleDeg, Number(els.angleSnap.value));
+    let radiusOffset = 0;
+    if (!snap || els.radiusMode.value === "offset") {
+      radiusOffset = Math.sqrt(dx*dx + dy*dy) - ring.radius;
+    }
+    const a = degToRad(angleDeg);
+    const r = ring.radius + radiusOffset;
+    return {
+      angleDeg,
+      radiusOffset,
+      x: CENTER.x + Math.cos(a) * r,
+      y: CENTER.y + Math.sin(a) * r
+    };
+  }
+
+  function pointToSubOrbit(point, subRingId, snap){
+    const sub = getSubRing(subRingId);
+    if (!sub) return { angleDeg:0, radiusOffset:0, x:point.x, y:point.y };
+    const c = getSubRingCenter(sub);
+    const dx = point.x - c.x;
+    const dy = point.y - c.y;
+    let angleDeg = normalizeDeg(Math.atan2(dy, dx) * 180 / Math.PI);
+    if (snap) angleDeg = snapDeg(angleDeg, Number(els.angleSnap.value));
+    let radiusOffset = 0;
+    if (!snap || els.radiusMode.value === "offset") {
+      radiusOffset = Math.sqrt(dx*dx + dy*dy) - sub.radius;
+    }
+    const a = degToRad(angleDeg);
+    const r = sub.radius + radiusOffset;
+    return {
+      angleDeg,
+      radiusOffset,
+      x: c.x + Math.cos(a) * r,
+      y: c.y + Math.sin(a) * r
+    };
+  }
+
+  function pointToSubAnchor(point, parentMainRingId, snap){
+    const ring = getMainRing(parentMainRingId);
+    if (!ring) return { angleDeg:0, x:point.x, y:point.y };
+    const dx = point.x - CENTER.x;
+    const dy = point.y - CENTER.y;
+    let angleDeg = normalizeDeg(Math.atan2(dy, dx) * 180 / Math.PI);
+    if (snap) angleDeg = snapDeg(angleDeg, Number(els.subAnchorSnap.value));
+    const a = degToRad(angleDeg);
+    return {
+      angleDeg,
+      x: CENTER.x + Math.cos(a) * ring.radius,
+      y: CENTER.y + Math.sin(a) * ring.radius
+    };
+  }
+
+  function addNodeAt(point){
+    const orbitType = els.addOrbitType.value;
+    const node = {
+      id: "n" + (++idCounter),
+      name: "node",
+      desc: "",
+      type: els.addNodeType.value,
+      size: Math.max(4, Number(els.addNodeSize.value || 14)),
+      orbitType,
+      mainRingId: els.addMainRing.value,
+      subRingId: els.addSubRing.value,
+      angleDeg: 0,
+      radiusOffset: 0,
+      x: point.x,
+      y: point.y
+    };
+
+    if (orbitType === "main") {
+      const p = pointToMainOrbit(point, node.mainRingId, els.snapEnabled.checked);
+      node.angleDeg = p.angleDeg;
+      node.radiusOffset = p.radiusOffset;
+      node.x = p.x;
+      node.y = p.y;
+    } else if (orbitType === "sub") {
+      if (!node.subRingId && data.subRings[0]) node.subRingId = data.subRings[0].id;
+      const p = pointToSubOrbit(point, node.subRingId, els.snapEnabled.checked);
+      node.angleDeg = p.angleDeg;
+      node.radiusOffset = p.radiusOffset;
+      node.x = p.x;
+      node.y = p.y;
+    }
+
+    data.nodes.push(node);
+    if (node.type === "start" && !data.activeStartId) {
+      data.activeStartId = node.id;
+    }
+    selectedNodeId = node.id;
+    selectedSubringId = null;
+    populateSelectors();
+    loadNodeProperties();
+    saveHistory();
+    render();
+  }
+
+  function moveNode(node, point){
+    const snap = els.snapEnabled.checked;
+    if (node.orbitType === "free") {
+      node.x = point.x;
+      node.y = point.y;
+      return;
+    }
+    if (node.orbitType === "main") {
+      const p = pointToMainOrbit(point, node.mainRingId, snap);
+      node.angleDeg = p.angleDeg;
+      node.radiusOffset = p.radiusOffset;
+      node.x = p.x;
+      node.y = p.y;
+      return;
+    }
+    if (node.orbitType === "sub") {
+      const p = pointToSubOrbit(point, node.subRingId, snap);
+      node.angleDeg = p.angleDeg;
+      node.radiusOffset = p.radiusOffset;
+      node.x = p.x;
+      node.y = p.y;
+    }
+  }
+
+  function moveSubring(sub, point){
+    const snap = els.snapEnabled.checked;
+    const p = pointToSubAnchor(point, sub.parentMainRingId, snap);
+    sub.anchorAngleDeg = p.angleDeg;
+  }
+
+  function deleteSelectedNode(){
+    if (!selectedNodeId) return;
+    const node = data.nodes.find(n => n.id === selectedNodeId);
+    if (!node) return;
+
+    data.nodes = data.nodes.filter(n => n.id !== selectedNodeId);
+    data.connections = data.connections.filter(c => c[0] !== selectedNodeId && c[1] !== selectedNodeId);
+    if (data.activeStartId === selectedNodeId) {
+      const firstStart = data.nodes.find(n => n.type === "start");
+      data.activeStartId = firstStart ? firstStart.id : "";
+    }
+    selectedNodeId = null;
+    populateSelectors();
+    saveHistory();
+    render();
+  }
+
+  function deleteSelectedSubring(){
+    if (!selectedSubringId) return;
+    const hasNodes = data.nodes.some(n => n.subRingId === selectedSubringId);
+    if (hasNodes) {
+      alert("This subring still has nodes attached to it.");
+      return;
+    }
+    data.subRings = data.subRings.filter(s => s.id !== selectedSubringId);
+    selectedSubringId = null;
+    populateSelectors();
+    saveHistory();
+    render();
+  }
+
+  function addMainRing(){
+    const radius = Math.max(10, Number(els.newMainRingRadius.value || 140));
+    data.mainRings.push({
+      id: "mr" + (data.mainRings.length + 1),
+      radius
+    });
+    populateSelectors();
+    saveHistory();
+    render();
+  }
+
+  function addSubring(){
+    if (!els.newSubringParent.value) return;
+    data.subRings.push({
+      id: "sr" + (data.subRings.length + 1),
+      parentMainRingId: els.newSubringParent.value,
+      anchorAngleDeg: Number(els.newSubringAngle.value || 0),
+      radius: Math.max(10, Number(els.newSubringRadius.value || 75))
+    });
+    populateSelectors();
+    saveHistory();
+    render();
+  }
+
+  function exportJSON(){
+    refreshComputedPositions();
+    jsonBox.value = JSON.stringify(data, null, 2);
+  }
+
+  function importJSON(){
+    try {
+      const parsed = JSON.parse(jsonBox.value);
+      if (!parsed.mainRings || !parsed.subRings || !parsed.nodes || !parsed.connections) {
+        throw new Error("Missing required fields.");
+      }
+      data = parsed;
+      selectedNodeId = null;
+      selectedSubringId = null;
+      populateSelectors();
+      refreshComputedPositions();
+      saveHistory();
+      render();
+    } catch (err) {
+      alert("Invalid JSON");
+    }
+  }
+
+  function drawRings(){
+    ringsLayer.innerHTML = "";
+
+    for (const ring of data.mainRings) {
+      const circle = createSvg("circle");
+      circle.setAttribute("class", "main-ring");
+      circle.setAttribute("cx", CENTER.x);
+      circle.setAttribute("cy", CENTER.y);
+      circle.setAttribute("r", ring.radius);
+      ringsLayer.appendChild(circle);
+    }
+
+    for (const sub of data.subRings) {
+      const c = getSubRingCenter(sub);
+
+      const link = createSvg("line");
+      link.setAttribute("class", "sub-link");
+      link.setAttribute("x1", CENTER.x);
+      link.setAttribute("y1", CENTER.y);
+      link.setAttribute("x2", c.x);
+      link.setAttribute("y2", c.y);
+      ringsLayer.appendChild(link);
+
+      const circle = createSvg("circle");
+      circle.setAttribute("class", "sub-ring");
+      circle.setAttribute("cx", c.x);
+      circle.setAttribute("cy", c.y);
+      circle.setAttribute("r", sub.radius);
+      ringsLayer.appendChild(circle);
+
+      const anchor = createSvg("circle");
+      anchor.setAttribute("class", "sub-anchor" + (selectedSubringId === sub.id ? " selected" : ""));
+      anchor.setAttribute("cx", c.x);
+      anchor.setAttribute("cy", c.y);
+      anchor.setAttribute("r", 8);
+      ringsLayer.appendChild(anchor);
+
+      anchor.addEventListener("mousedown", function(evt){
+        evt.stopPropagation();
+        selectedSubringId = sub.id;
+        selectedNodeId = null;
+        populateSelectors();
+        loadSubringProperties();
+        dragState = { kind:"subring", id:sub.id };
+        render();
+      });
+
+      anchor.addEventListener("click", function(evt){
+        evt.stopPropagation();
+        selectedSubringId = sub.id;
+        selectedNodeId = null;
+        populateSelectors();
+        loadSubringProperties();
+        render();
+      });
+    }
+  }
+
+  function drawConnections(){
+    connectionsLayer.innerHTML = "";
+    for (const c of data.connections) {
+      const a = data.nodes.find(n => n.id === c[0]);
+      const b = data.nodes.find(n => n.id === c[1]);
+      if (!a || !b) continue;
+
+      const line = createSvg("line");
+      line.setAttribute("class", "connection");
+      line.setAttribute("x1", a.x);
+      line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x);
+      line.setAttribute("y2", b.y);
+      connectionsLayer.appendChild(line);
+    }
+  }
+
+  function drawNodes(){
+    nodesLayer.innerHTML = "";
+    for (const node of data.nodes) {
+      const g = createSvg("g");
+      let cls = "node";
+      if (node.id === selectedNodeId) cls += " selected";
+      if (node.type === "start") cls += " start";
+      if (node.type === "start" && data.activeStartId && node.id !== data.activeStartId) cls += " disabled";
+      g.setAttribute("class", cls);
+
+      const r = nodeRadius(node.type, node.size);
+
+      const outer = createSvg("circle");
+      outer.setAttribute("class", "outer");
+      outer.setAttribute("cx", node.x);
+      outer.setAttribute("cy", node.y);
+      outer.setAttribute("r", r + 5);
+
+      const core = createSvg("circle");
+      core.setAttribute("class", "core");
+      core.setAttribute("cx", node.x);
+      core.setAttribute("cy", node.y);
+      core.setAttribute("r", r);
+
+      const label = createSvg("text");
+      label.setAttribute("class", "node-label");
+      label.setAttribute("x", node.x);
+      label.setAttribute("y", node.y + r + 18);
+      label.textContent = node.name || node.id;
+
+      g.appendChild(outer);
+      g.appendChild(core);
+      g.appendChild(label);
+      nodesLayer.appendChild(g);
+
+      g.addEventListener("mousedown", function(evt){
+        evt.stopPropagation();
+        if (mode === "select") {
+          selectedNodeId = node.id;
+          selectedSubringId = null;
+          populateSelectors();
+          loadNodeProperties();
+          dragState = { kind:"node", id:node.id };
+          render();
+        } else if (mode === "connect") {
+          if (!connectStartId) {
+            connectStartId = node.id;
+          } else if (connectStartId !== node.id) {
+            const exists = data.connections.some(c =>
+              (c[0] === connectStartId && c[1] === node.id) ||
+              (c[0] === node.id && c[1] === connectStartId)
+            );
+            if (!exists) data.connections.push([connectStartId, node.id]);
+            connectStartId = null;
+            saveHistory();
+            render();
+          }
+        }
+      });
+
+      g.addEventListener("click", function(evt){
+        evt.stopPropagation();
+        if (mode === "select") {
+          selectedNodeId = node.id;
+          selectedSubringId = null;
+          populateSelectors();
+          loadNodeProperties();
+          render();
+        }
+      });
+    }
+  }
+
+  function render(){
+    refreshComputedPositions();
+    applyTransform();
+    drawRings();
+    drawConnections();
+    drawNodes();
+  }
+
+  svg.addEventListener("mousedown", function(evt){
+    const point = screenToSvg(evt);
+
+    if (mode === "add") {
+      addNodeAt(point);
+      return;
+    }
+
+    if (mode === "select") {
+      panState.dragging = true;
+      svg.classList.add("dragging");
+      panState.startX = evt.clientX;
+      panState.startY = evt.clientY;
+      panState.originX = view.x;
+      panState.originY = view.y;
+      if (!dragState) {
+        selectedNodeId = null;
+        selectedSubringId = null;
+        render();
+      }
+    }
+  });
+
+  window.addEventListener("mousemove", function(evt){
+    const point = screenToSvg(evt);
+
+    if (dragState) {
+      if (dragState.kind === "node") {
+        const node = data.nodes.find(n => n.id === dragState.id);
+        if (node) {
+          moveNode(node, point);
+          if (selectedNodeId === node.id) loadNodeProperties();
+          render();
+        }
+      } else if (dragState.kind === "subring") {
+        const sub = getSubRing(dragState.id);
+        if (sub) {
+          moveSubring(sub, point);
+          loadSubringProperties();
+          render();
+        }
+      }
+      return;
+    }
+
+    if (panState.dragging) {
+      const dx = evt.clientX - panState.startX;
+      const dy = evt.clientY - panState.startY;
+      view.x = panState.originX + dx * (1600 / svg.getBoundingClientRect().width);
+      view.y = panState.originY + dy * (1000 / svg.getBoundingClientRect().height);
+      applyTransform();
+    }
+  });
+
+  window.addEventListener("mouseup", function(){
+    if (dragState) {
+      saveHistory();
+    }
+    dragState = null;
+    panState.dragging = false;
+    svg.classList.remove("dragging");
+  });
+
+  svg.addEventListener("wheel", function(evt){
+    evt.preventDefault();
+
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (evt.clientX - rect.left) * (1600 / rect.width);
+    const mouseY = (evt.clientY - rect.top) * (1000 / rect.height);
+
+    const worldX = (mouseX - view.x) / view.scale;
+    const worldY = (mouseY - view.y) / view.scale;
+
+    if (evt.deltaY < 0) view.scale *= 1.1;
+    else view.scale *= 0.9;
+
+    if (view.scale < 0.35) view.scale = 0.35;
+    if (view.scale > 3.0) view.scale = 3.0;
+
+    view.x = mouseX - worldX * view.scale;
+    view.y = mouseY - worldY * view.scale;
+
+    applyTransform();
+  }, { passive:false });
+
+  els.modeSelectBtn.addEventListener("click", () => setMode("select"));
+  els.modeAddBtn.addEventListener("click", () => setMode("add"));
+  els.modeConnectBtn.addEventListener("click", () => setMode("connect"));
+
+  els.undoBtn.addEventListener("click", undo);
+  els.redoBtn.addEventListener("click", redo);
+  els.resetViewBtn.addEventListener("click", function(){
+    view.x = 0;
+    view.y = 0;
+    view.scale = 1;
+    applyTransform();
+  });
+
+  els.deleteNodeBtn.addEventListener("click", deleteSelectedNode);
+  els.deleteSubringBtn.addEventListener("click", deleteSelectedSubring);
+  els.deleteLinkBtn.addEventListener("click", function(){
+    if (data.connections.length) {
+      data.connections.pop();
+      saveHistory();
+      render();
+    }
+  });
+
+  els.addMainRingBtn.addEventListener("click", addMainRing);
+  els.addSubringBtn.addEventListener("click", addSubring);
+  els.exportBtn.addEventListener("click", exportJSON);
+  els.importBtn.addEventListener("click", importJSON);
+
+  els.applyPropsBtn.addEventListener("click", applyNodeProperties);
+  els.resnapBtn.addEventListener("click", resnapSelectedNode);
+
+  els.activeStartSelect.addEventListener("change", function(){
+    data.activeStartId = els.activeStartSelect.value || "";
+    saveHistory();
+    render();
+  });
+
+  els.selectedSubringSelect.addEventListener("change", function(){
+    selectedSubringId = els.selectedSubringSelect.value || null;
+    loadSubringProperties();
+    render();
+  });
+
+  els.applySubringBtn.addEventListener("click", applySubringProperties);
+
+  populateSelectors();
+  refreshComputedPositions();
+  setMode("select");
+  saveHistory();
+  render();
+  exportJSON();
+})();
+</script>
+</body>
+</html>

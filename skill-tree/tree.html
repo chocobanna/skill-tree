@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radial Skill Tree</title>
+  <style>
+    :root {
+      --bg-1: #090b11;
+      --bg-2: #111624;
+      --ring: rgba(180, 150, 100, 0.15);
+      --line: rgba(150, 140, 120, 0.22);
+      --line-active: rgba(255, 196, 92, 0.85);
+      --text: #e8dcc0;
+      --muted: #a89b82;
+      --node-fill: #1c2433;
+      --node-stroke: #8b7550;
+      --node-glow: rgba(255, 190, 80, 0.22);
+      --node-active-fill: #f0b84d;
+      --node-active-stroke: #fff0c6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at center, rgba(255,190,80,0.06) 0%, transparent 18%),
+        radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      user-select: none;
+    }
+
+    svg.dragging {
+      cursor: grabbing;
+    }
+
+    .ring {
+      fill: none;
+      stroke: var(--ring);
+      stroke-width: 2;
+      stroke-dasharray: 2 12;
+    }
+
+    .connection {
+      stroke: var(--line);
+      stroke-width: 4;
+      stroke-linecap: round;
+      transition: stroke 0.18s ease, filter 0.18s ease;
+    }
+
+    .connection.active {
+      stroke: var(--line-active);
+      filter: drop-shadow(0 0 6px rgba(255, 200, 90, 0.4));
+    }
+
+    .node-group {
+      cursor: pointer;
+    }
+
+    .node-outer {
+      fill: rgba(10, 12, 18, 0.95);
+      stroke: rgba(255, 213, 129, 0.18);
+      stroke-width: 2;
+      filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.7));
+    }
+
+    .node-core {
+      fill: var(--node-fill);
+      stroke: var(--node-stroke);
+      stroke-width: 2;
+      transition: fill 0.18s ease, stroke 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+      transform-origin: center;
+      filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.5));
+    }
+
+    .node-group:hover .node-core {
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 10px var(--node-glow));
+    }
+
+    .node-group.active .node-core {
+      fill: var(--node-active-fill);
+      stroke: var(--node-active-stroke);
+      filter:
+        drop-shadow(0 0 7px rgba(255, 220, 130, 0.75))
+        drop-shadow(0 0 16px rgba(255, 180, 60, 0.45));
+    }
+
+    .node-icon {
+      fill: rgba(255, 245, 220, 0.9);
+      pointer-events: none;
+    }
+
+    .center-orb {
+      fill: url(#orbGradient);
+      stroke: rgba(255, 226, 163, 0.75);
+      stroke-width: 4;
+      filter:
+        drop-shadow(0 0 12px rgba(255, 195, 90, 0.45))
+        drop-shadow(0 0 32px rgba(255, 162, 58, 0.25));
+    }
+
+    .center-core {
+      fill: rgba(255, 235, 180, 0.9);
+      opacity: 0.85;
+    }
+
+    .title {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      z-index: 2;
+      pointer-events: none;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 2px;
+    }
+
+    .title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hud {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      z-index: 2;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: rgba(8, 10, 14, 0.72);
+      border: 1px solid rgba(255, 215, 140, 0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    }
+
+    .hud button {
+      background: linear-gradient(180deg, #2c3445, #171d29);
+      color: var(--text);
+      border: 1px solid rgba(255, 217, 157, 0.18);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .hud button:hover {
+      filter: brightness(1.08);
+    }
+
+    .hud .points {
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .tooltip {
+      position: absolute;
+      min-width: 220px;
+      max-width: 280px;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(20, 16, 10, 0.96), rgba(8, 10, 16, 0.96));
+      border: 1px solid rgba(255, 205, 120, 0.22);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.55);
+      color: var(--text);
+      opacity: 0;
+      transform: translate(12px, 12px);
+      transition: opacity 0.12s ease;
+      z-index: 10;
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+    }
+
+    .tooltip .name {
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #ffe8b0;
+    }
+
+    .tooltip .type {
+      font-size: 12px;
+      color: #c8b791;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .tooltip .desc {
+      font-size: 13px;
+      line-height: 1.45;
+      color: #e6dcc7;
+    }
+
+    .legend {
+      position: absolute;
+      bottom: 18px;
+      left: 20px;
+      z-index: 2;
+      background: rgba(8, 10, 14, 0.65);
+      border: 1px solid rgba(255, 215, 140, 0.1);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend b {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="title">
+      <h1>RADIAL SKILL TREE</h1>
+      <p>Scroll to zoom · drag to pan · click nodes to allocate</p>
+    </div>
+
+    <div class="hud">
+      <button id="resetViewBtn">Reset View</button>
+      <button id="resetTreeBtn">Refund All</button>
+      <div class="points">Allocated: <span id="allocatedCount">0</span></div>
+    </div>
+
+    <div class="legend">
+      <b>Types:</b> Normal · Notable · Keystone
+    </div>
+
+    <div id="tooltip" class="tooltip">
+      <div class="name"></div>
+      <div class="type"></div>
+      <div class="desc"></div>
+    </div>
+
+    <svg id="tree" viewBox="0 0 1600 1000">
+      <defs>
+        <radialGradient id="orbGradient" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffefc2"></stop>
+          <stop offset="35%" stop-color="#f4bb54"></stop>
+          <stop offset="70%" stop-color="#6f4317"></stop>
+          <stop offset="100%" stop-color="#20150a"></stop>
+        </radialGradient>
+      </defs>
+
+      <g id="viewport">
+        <g id="rings"></g>
+        <g id="connections"></g>
+        <g id="nodes"></g>
+      </g>
+    </svg>
+  </div>
+
+  <script>
+    const svg = document.getElementById("tree");
+    const viewport = document.getElementById("viewport");
+    const ringsLayer = document.getElementById("rings");
+    const connectionsLayer = document.getElementById("connections");
+    const nodesLayer = document.getElementById("nodes");
+    const tooltip = document.getElementById("tooltip");
+    const allocatedCountEl = document.getElementById("allocatedCount");
+    const resetViewBtn = document.getElementById("resetViewBtn");
+    const resetTreeBtn = document.getElementById("resetTreeBtn");
+
+    const CENTER = { x: 800, y: 500 };
+    const rings = [90, 180, 290, 410];
+
+    const typeRadius = {
+      normal: 12,
+      notable: 18,
+      keystone: 26
+    };
+
+    const nodes = [
+      { id: "start", name: "Awakened Core", type: "start", desc: "The origin point of your build.", x: 800, y: 500, allocated: true },
+
+      { id: "n1", name: "Quickstep", type: "normal", desc: "+5% Attack Speed", angle: -90, ring: 0 },
+      { id: "n2", name: "Focus", type: "normal", desc: "+8 Intelligence", angle: -18, ring: 0 },
+      { id: "n3", name: "Brutality", type: "normal", desc: "+10 Strength", angle: 54, ring: 0 },
+      { id: "n4", name: "Reflexes", type: "normal", desc: "+10 Dexterity", angle: 126, ring: 0 },
+      { id: "n5", name: "Resolve", type: "normal", desc: "+6% Maximum Life", angle: 198, ring: 0 },
+
+      { id: "n6", name: "Arcane Blood", type: "notable", desc: "+20 Intelligence, Mana Regen", angle: -90, ring: 1 },
+      { id: "n7", name: "Deadeye Drift", type: "notable", desc: "+20 Dexterity, Projectile Speed", angle: -18, ring: 1 },
+      { id: "n8", name: "Crushing Weight", type: "notable", desc: "+20 Strength, Melee Damage", angle: 54, ring: 1 },
+      { id: "n9", name: "Hunter's Nerve", type: "normal", desc: "+14% Accuracy", angle: 126, ring: 1 },
+      { id: "n10", name: "Iron Skin", type: "notable", desc: "+Armour, +Life", angle: 198, ring: 1 },
+
+      { id: "n11", name: "Storm Conduit", type: "normal", desc: "+Lightning Damage", angle: -126, ring: 2 },
+      { id: "n12", name: "Celestial Method", type: "keystone", desc: "Spells gain +1 chain. Less cast speed.", angle: -54, ring: 2 },
+      { id: "n13", name: "Blood Engine", type: "keystone", desc: "Skills cost Life instead of Mana.", angle: 18, ring: 2 },
+      { id: "n14", name: "Predator's Orbit", type: "notable", desc: "+Dexterity, Movement Speed", angle: 90, ring: 2 },
+      { id: "n15", name: "Titan Frame", type: "notable", desc: "+Strength, +Armour", angle: 162, ring: 2 },
+      { id: "n16", name: "Mind Carving", type: "notable", desc: "+Intelligence, Spell Damage", angle: 234, ring: 2 },
+
+      { id: "n17", name: "Avatar of Ruin", type: "keystone", desc: "More Elemental Damage. No Chaos Damage.", angle: -90, ring: 3 },
+      { id: "n18", name: "Glass Gale", type: "keystone", desc: "More Evasion. Less Life.", angle: -18, ring: 3 },
+      { id: "n19", name: "Earthbreaker Will", type: "keystone", desc: "Longer stuns. Cannot evade.", angle: 54, ring: 3 },
+      { id: "n20", name: "Echo Chamber", type: "keystone", desc: "Skills repeat. Less damage.", angle: 126, ring: 3 },
+      { id: "n21", name: "Undying Bastion", type: "keystone", desc: "More Life. No ES recharge.", angle: 198, ring: 3 },
+      { id: "n22", name: "Night Prowler", type: "notable", desc: "+Dexterity, Crit Chance", angle: 270, ring: 3 }
+    ];
+
+    const connections = [
+      ["start", "n1"], ["start", "n2"], ["start", "n3"], ["start", "n4"], ["start", "n5"],
+      ["n1", "n6"], ["n2", "n7"], ["n3", "n8"], ["n4", "n9"], ["n5", "n10"],
+      ["n6", "n11"], ["n6", "n12"], ["n7", "n12"], ["n7", "n13"], ["n8", "n13"],
+      ["n8", "n14"], ["n9", "n14"], ["n9", "n15"], ["n10", "n15"], ["n10", "n16"], ["n6", "n16"],
+      ["n11", "n17"], ["n12", "n17"], ["n12", "n18"], ["n13", "n18"], ["n13", "n19"],
+      ["n14", "n19"], ["n14", "n20"], ["n15", "n20"], ["n15", "n21"], ["n16", "n21"], ["n16", "n22"], ["n11", "n22"]
+    ];
+
+    function polarToCartesian(cx, cy, radius, angleDeg) {
+      const a = (angleDeg - 90) * Math.PI / 180;
+      return {
+        x: cx + radius * Math.cos(a),
+        y: cy + radius * Math.sin(a)
+      };
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].id !== "start") {
+        const p = polarToCartesian(CENTER.x, CENTER.y, rings[nodes[i].ring], nodes[i].angle);
+        nodes[i].x = p.x;
+        nodes[i].y = p.y;
+        nodes[i].allocated = false;
+      }
+    }
+
+    const nodeMap = {};
+    const adjacency = {};
+    for (let i = 0; i < nodes.length; i++) {
+      nodeMap[nodes[i].id] = nodes[i];
+      adjacency[nodes[i].id] = [];
+    }
+
+    for (let i = 0; i < connections.length; i++) {
+      const a = connections[i][0];
+      const b = connections[i][1];
+      adjacency[a].push(b);
+      adjacency[b].push(a);
+    }
+
+    function createSvg(tag) {
+      return document.createElementNS("http://www.w3.org/2000/svg", tag);
+    }
+
+    function buildRings() {
+      for (let i = 0; i < rings.length; i++) {
+        const ring = createSvg("circle");
+        ring.setAttribute("class", "ring");
+        ring.setAttribute("cx", CENTER.x);
+        ring.setAttribute("cy", CENTER.y);
+        ring.setAttribute("r", rings[i]);
+        ringsLayer.appendChild(ring);
+      }
+    }
+
+    function createIcon(group, node) {
+      const path = createSvg("path");
+      path.setAttribute("class", "node-icon");
+
+      let d = "";
+      if (node.type === "normal") {
+        d = "M " + (node.x - 4) + " " + node.y +
+            " L " + node.x + " " + (node.y - 6) +
+            " L " + (node.x + 4) + " " + node.y +
+            " L " + node.x + " " + (node.y + 6) + " Z";
+      } else if (node.type === "notable") {
+        d = "M " + (node.x - 6) + " " + (node.y + 4) +
+            " L " + node.x + " " + (node.y - 7) +
+            " L " + (node.x + 6) + " " + (node.y + 4) + " Z";
+      } else if (node.type === "keystone") {
+        d = "M " + node.x + " " + (node.y - 9) +
+            " L " + (node.x + 8) + " " + (node.y - 2) +
+            " L " + (node.x + 5) + " " + (node.y + 8) +
+            " L " + (node.x - 5) + " " + (node.y + 8) +
+            " L " + (node.x - 8) + " " + (node.y - 2) + " Z";
+      }
+
+      path.setAttribute("d", d);
+      group.appendChild(path);
+    }
+
+    function buildConnections() {
+      for (let i = 0; i < connections.length; i++) {
+        const a = nodeMap[connections[i][0]];
+        const b = nodeMap[connections[i][1]];
+        const line = createSvg("line");
+        line.setAttribute("class", "connection");
+        line.setAttribute("x1", a.x);
+        line.setAttribute("y1", a.y);
+        line.setAttribute("x2", b.x);
+        line.setAttribute("y2", b.y);
+        line.dataset.a = a.id;
+        line.dataset.b = b.id;
+        connectionsLayer.appendChild(line);
+      }
+    }
+
+    function buildNodes() {
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+
+        if (node.id === "start") {
+          const orb = createSvg("circle");
+          orb.setAttribute("class", "center-orb");
+          orb.setAttribute("cx", node.x);
+          orb.setAttribute("cy", node.y);
+          orb.setAttribute("r", 36);
+          nodesLayer.appendChild(orb);
+
+          const core = createSvg("circle");
+          core.setAttribute("class", "center-core");
+          core.setAttribute("cx", node.x);
+          core.setAttribute("cy", node.y);
+          core.setAttribute("r", 8);
+          nodesLayer.appendChild(core);
+          continue;
+        }
+
+        const group = createSvg("g");
+        group.setAttribute("class", "node-group");
+        group.dataset.id = node.id;
+
+        const outer = createSvg("circle");
+        outer.setAttribute("class", "node-outer");
+        outer.setAttribute("cx", node.x);
+        outer.setAttribute("cy", node.y);
+        outer.setAttribute("r", typeRadius[node.type] + 5);
+
+        const core = createSvg("circle");
+        core.setAttribute("class", "node-core");
+        core.setAttribute("cx", node.x);
+        core.setAttribute("cy", node.y);
+        core.setAttribute("r", typeRadius[node.type]);
+
+        group.appendChild(outer);
+        group.appendChild(core);
+        createIcon(group, node);
+
+        group.addEventListener("mouseenter", function(e) {
+          showTooltip(e, node);
+        });
+        group.addEventListener("mousemove", moveTooltip);
+        group.addEventListener("mouseleave", hideTooltip);
+        group.addEventListener("click", function(e) {
+          e.stopPropagation();
+          toggleNode(node.id);
+        });
+
+        nodesLayer.appendChild(group);
+      }
+    }
+
+    function canAllocate(nodeId) {
+      if (nodeId === "start") return false;
+      if (nodeMap[nodeId].allocated) return true;
+
+      const neighbors = adjacency[nodeId];
+      for (let i = 0; i < neighbors.length; i++) {
+        if (nodeMap[neighbors[i]].allocated) return true;
+      }
+      return false;
+    }
+
+    function refundBlocked(nodeId) {
+      if (nodeId === "start") return true;
+
+      const active = {};
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].allocated && nodes[i].id !== nodeId) {
+          active[nodes[i].id] = true;
+        }
+      }
+      active["start"] = true;
+
+      const queue = ["start"];
+      const seen = { start: true };
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const neighbors = adjacency[current];
+        for (let i = 0; i < neighbors.length; i++) {
+          const next = neighbors[i];
+          if (active[next] && !seen[next]) {
+            seen[next] = true;
+            queue.push(next);
+          }
+        }
+      }
+
+      for (let i = 0; i < nodes.length; i++) {
+        const id = nodes[i].id;
+        if (active[id] && !seen[id]) return true;
+      }
+
+      return false;
+    }
+
+    function toggleNode(nodeId) {
+      const node = nodeMap[nodeId];
+      if (!node || node.id === "start") return;
+
+      if (!node.allocated) {
+        if (!canAllocate(nodeId)) return;
+        node.allocated = true;
+      } else {
+        if (refundBlocked(nodeId)) return;
+        node.allocated = false;
+      }
+
+      renderState();
+    }
+
+    function renderState() {
+      const groups = document.querySelectorAll(".node-group");
+      for (let i = 0; i < groups.length; i++) {
+        const id = groups[i].dataset.id;
+        const node = nodeMap[id];
+        if (node.allocated) {
+          groups[i].classList.add("active");
+        } else {
+          groups[i].classList.remove("active");
+        }
+        groups[i].style.opacity = (canAllocate(id) || node.allocated) ? "1" : "0.55";
+      }
+
+      const lines = document.querySelectorAll(".connection");
+      for (let i = 0; i < lines.length; i++) {
+        const a = nodeMap[lines[i].dataset.a];
+        const b = nodeMap[lines[i].dataset.b];
+        if (a.allocated && b.allocated) {
+          lines[i].classList.add("active");
+        } else {
+          lines[i].classList.remove("active");
+        }
+      }
+
+      let count = 0;
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].allocated && nodes[i].id !== "start") count++;
+      }
+      allocatedCountEl.textContent = count;
+    }
+
+    function showTooltip(event, node) {
+      tooltip.querySelector(".name").textContent = node.name;
+      tooltip.querySelector(".type").textContent = node.type;
+      tooltip.querySelector(".desc").textContent = node.desc;
+      tooltip.classList.add("visible");
+      moveTooltip(event);
+    }
+
+    function moveTooltip(event) {
+      tooltip.style.left = (event.clientX + 14) + "px";
+      tooltip.style.top = (event.clientY + 14) + "px";
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove("visible");
+    }
+
+    resetTreeBtn.addEventListener("click", function() {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].id !== "start") {
+          nodes[i].allocated = false;
+        }
+      }
+      renderState();
+    });
+
+    const state = {
+      x: 0,
+      y: 0,
+      scale: 1
+    };
+
+    function applyTransform() {
+      viewport.setAttribute("transform", "translate(" + state.x + " " + state.y + ") scale(" + state.scale + ")");
+    }
+
+    resetViewBtn.addEventListener("click", function() {
+      state.x = 0;
+      state.y = 0;
+      state.scale = 1;
+      applyTransform();
+    });
+
+    let dragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragOriginX = 0;
+    let dragOriginY = 0;
+
+    svg.addEventListener("mousedown", function(e) {
+      dragging = true;
+      svg.classList.add("dragging");
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragOriginX = state.x;
+      dragOriginY = state.y;
+    });
+
+    window.addEventListener("mousemove", function(e) {
+      if (!dragging) return;
+      state.x = dragOriginX + (e.clientX - dragStartX);
+      state.y = dragOriginY + (e.clientY - dragStartY);
+      applyTransform();
+    });
+
+    window.addEventListener("mouseup", function() {
+      dragging = false;
+      svg.classList.remove("dragging");
+    });
+
+    svg.addEventListener("wheel", function(e) {
+      e.preventDefault();
+
+      const rect = svg.getBoundingClientRect();
+
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const worldX = (mouseX - state.x) / state.scale;
+      const worldY = (mouseY - state.y) / state.scale;
+
+      if (e.deltaY < 0) {
+        state.scale *= 1.1;
+      } else {
+        state.scale *= 0.9;
+      }
+
+      if (state.scale < 0.45) state.scale = 0.45;
+      if (state.scale > 2.5) state.scale = 2.5;
+
+      state.x = mouseX - worldX * state.scale;
+      state.y = mouseY - worldY * state.scale;
+
+      applyTransform();
+
+    }, { passive: false });
+
+    buildRings();
+    buildConnections();
+    buildNodes();
+    renderState();
+    applyTransform();
+  </script>
+</body>
+</html>

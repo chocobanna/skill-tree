@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Skill Tree Viewer</title>
+<style>
+  :root{
+    --bg1:#090b11;
+    --bg2:#111624;
+    --ring:rgba(180,150,100,0.15);
+    --subring:rgba(100,170,255,0.18);
+    --line:rgba(150,140,120,0.22);
+    --line-active:rgba(255,196,92,0.85);
+    --text:#e8dcc0;
+    --muted:#a89b82;
+    --node-fill:#1c2433;
+    --node-stroke:#8b7550;
+    --node-glow:rgba(255,190,80,0.22);
+    --node-active-fill:#f0b84d;
+    --node-active-stroke:#fff0c6;
+    --start:#5eff9a;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    background:
+      radial-gradient(circle at center, rgba(255,190,80,0.06) 0%, transparent 18%),
+      radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
+    color:var(--text);
+    font-family:Arial, Helvetica, sans-serif;
+  }
+
+  #app{
+    width:100%;
+    height:100%;
+    position:relative;
+  }
+
+  .panel{
+    position:absolute;
+    z-index:10;
+    background:rgba(10,14,20,0.92);
+    border:1px solid rgba(255,215,140,0.12);
+    border-radius:12px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.35);
+    padding:10px 12px;
+  }
+
+  #toolbar{
+    top:10px;
+    left:10px;
+    width:390px;
+  }
+
+  #jsonPanel{
+    left:10px;
+    bottom:10px;
+    width:520px;
+    height:200px;
+  }
+
+  #jsonBox{
+    width:100%;
+    height:100%;
+    resize:none;
+    background:#0b0f16;
+    color:var(--text);
+    border:1px solid rgba(255,215,140,0.12);
+    border-radius:8px;
+    padding:8px;
+    outline:none;
+    font-family:Consolas, monospace;
+    font-size:12px;
+  }
+
+  button, select{
+    background:linear-gradient(180deg, #1b2331, #101620);
+    color:var(--text);
+    border:1px solid rgba(255,215,140,0.16);
+    border-radius:8px;
+    padding:8px 10px;
+  }
+
+  button{ cursor:pointer; font-weight:bold; }
+  button:hover{ filter:brightness(1.08); }
+
+  .row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:center;
+  }
+
+  .row > *{ flex:1; }
+
+  .mini{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  svg{
+    width:100%;
+    height:100%;
+    display:block;
+    cursor:grab;
+    user-select:none;
+  }
+
+  svg.dragging{ cursor:grabbing; }
+
+  .main-ring{
+    fill:none;
+    stroke:var(--ring);
+    stroke-width:2;
+    stroke-dasharray:2 12;
+  }
+
+  .sub-ring{
+    fill:none;
+    stroke:var(--subring);
+    stroke-width:2;
+    stroke-dasharray:3 8;
+  }
+
+  .connection{
+    stroke:var(--line);
+    stroke-width:4;
+    stroke-linecap:round;
+    transition:stroke 0.18s ease, filter 0.18s ease;
+  }
+
+  .connection.active{
+    stroke:var(--line-active);
+    filter:drop-shadow(0 0 6px rgba(255,200,90,0.4));
+  }
+
+  .node{
+    cursor:pointer;
+  }
+
+  .node .outer{
+    fill:rgba(10,12,18,0.95);
+    stroke:rgba(255,213,129,0.18);
+    stroke-width:2;
+  }
+
+  .node .core{
+    fill:var(--node-fill);
+    stroke:var(--node-stroke);
+    stroke-width:2;
+    transition:fill 0.18s ease, stroke 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+    transform-origin:center;
+  }
+
+  .node:hover .core{
+    transform:scale(1.08);
+    filter:drop-shadow(0 0 10px var(--node-glow));
+  }
+
+  .node.active .core{
+    fill:var(--node-active-fill);
+    stroke:var(--node-active-stroke);
+    filter:
+      drop-shadow(0 0 7px rgba(255,220,130,0.75))
+      drop-shadow(0 0 16px rgba(255,180,60,0.45));
+  }
+
+  .node.start .core{
+    stroke:var(--start);
+  }
+
+  .node.disabled{
+    opacity:0.22;
+    pointer-events:none;
+  }
+
+  .tooltip{
+    position:absolute;
+    min-width:220px;
+    max-width:280px;
+    pointer-events:none;
+    background:linear-gradient(180deg, rgba(20,16,10,0.96), rgba(8,10,16,0.96));
+    border:1px solid rgba(255,205,120,0.22);
+    border-radius:12px;
+    padding:12px 14px;
+    box-shadow:0 10px 35px rgba(0,0,0,0.55);
+    color:var(--text);
+    opacity:0;
+    transform:translate(12px, 12px);
+    transition:opacity 0.12s ease;
+    z-index:20;
+  }
+
+  .tooltip.visible{ opacity:1; }
+  .tooltip .name{ font-weight:bold; margin-bottom:6px; color:#ffe8b0; }
+  .tooltip .type{ font-size:12px; color:#c8b791; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .tooltip .desc{ font-size:13px; line-height:1.45; color:#e6dcc7; }
+
+  .title{
+    position:absolute;
+    top:18px;
+    right:20px;
+    z-index:10;
+    text-align:right;
+    text-shadow:0 2px 12px rgba(0,0,0,0.6);
+  }
+
+  .title h1{
+    margin:0;
+    font-size:18px;
+    letter-spacing:2px;
+  }
+
+  .title p{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar" class="panel">
+    <div class="row">
+      <button id="loadBtn">Load JSON</button>
+      <button id="refundBtn">Refund All</button>
+      <button id="resetViewBtn">Reset View</button>
+    </div>
+    <div class="row">
+      <div>Allocated: <span id="allocatedCount">0</span></div>
+      <div>Active Start: <span id="activeStartLabel">None</span></div>
+    </div>
+    <div class="mini">
+      Paste editor JSON below, then click Load JSON.
+    </div>
+  </div>
+
+  <div id="jsonPanel" class="panel">
+    <textarea id="jsonBox" spellcheck="false"></textarea>
+  </div>
+
+  <div class="title">
+    <h1>SKILL TREE VIEWER</h1>
+    <p>Scroll to zoom · drag to pan · click nodes to allocate</p>
+  </div>
+
+  <div id="tooltip" class="tooltip">
+    <div class="name"></div>
+    <div class="type"></div>
+    <div class="desc"></div>
+  </div>
+
+  <svg id="tree" viewBox="0 0 1600 1000">
+    <g id="viewport">
+      <g id="ringsLayer"></g>
+      <g id="connectionsLayer"></g>
+      <g id="nodesLayer"></g>
+    </g>
+  </svg>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById("tree");
+  const viewport = document.getElementById("viewport");
+  const ringsLayer = document.getElementById("ringsLayer");
+  const connectionsLayer = document.getElementById("connectionsLayer");
+  const nodesLayer = document.getElementById("nodesLayer");
+  const tooltip = document.getElementById("tooltip");
+  const jsonBox = document.getElementById("jsonBox");
+  const allocatedCountEl = document.getElementById("allocatedCount");
+  const activeStartLabel = document.getElementById("activeStartLabel");
+
+  const CENTER = { x:800, y:500 };
+
+  let data = null;
+  let nodeMap = {};
+  let adjacency = {};
+
+  const view = { x:0, y:0, scale:1 };
+  let dragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let originX = 0;
+  let originY = 0;
+
+  function defaultData(){
+    return {
+      mainRings: [{id:"mr1", radius:120}],
+      subRings: [],
+      nodes: [
+        {id:"n1", name:"Start", desc:"Origin", type:"start", size:18, orbitType:"main", mainRingId:"mr1", subRingId:"", angleDeg:-90, radiusOffset:0, x:800, y:380}
+      ],
+      connections: [],
+      activeStartId: "n1"
+    };
+  }
+
+  function createSvg(tag){
+    return document.createElementNS("http://www.w3.org/2000/svg", tag);
+  }
+
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function getMainRing(id){
+    return data.mainRings.find(r => r.id === id) || null;
+  }
+
+  function getSubRing(id){
+    return data.subRings.find(r => r.id === id) || null;
+  }
+
+  function getSubRingCenter(sub){
+    const parent = getMainRing(sub.parentMainRingId);
+    if (!parent) return { x:CENTER.x, y:CENTER.y };
+    const a = degToRad(sub.anchorAngleDeg);
+    return {
+      x: CENTER.x + Math.cos(a) * parent.radius,
+      y: CENTER.y + Math.sin(a) * parent.radius
+    };
+  }
+
+  function computeNodePosition(node){
+    if (node.orbitType === "free") {
+      return { x: node.x, y: node.y };
+    }
+    if (node.orbitType === "main") {
+      const ring = getMainRing(node.mainRingId);
+      if (!ring) return { x:CENTER.x, y:CENTER.y };
+      const r = ring.radius + Number(node.radiusOffset || 0);
+      const a = degToRad(node.angleDeg);
+      return { x: CENTER.x + Math.cos(a) * r, y: CENTER.y + Math.sin(a) * r };
+    }
+    if (node.orbitType === "sub") {
+      const sub = getSubRing(node.subRingId);
+      if (!sub) return { x:CENTER.x, y:CENTER.y };
+      const c = getSubRingCenter(sub);
+      const r = sub.radius + Number(node.radiusOffset || 0);
+      const a = degToRad(node.angleDeg);
+      return { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r };
+    }
+    return { x:CENTER.x, y:CENTER.y };
+  }
+
+  function applyPositions(){
+    for (const node of data.nodes) {
+      if (node.orbitType !== "free") {
+        const p = computeNodePosition(node);
+        node.x = p.x;
+        node.y = p.y;
+      }
+      if (typeof node.allocated !== "boolean") {
+        node.allocated = node.id === data.activeStartId;
+      }
+    }
+  }
+
+  function buildMaps(){
+    nodeMap = {};
+    adjacency = {};
+    for (const n of data.nodes) {
+      nodeMap[n.id] = n;
+      adjacency[n.id] = [];
+    }
+    for (const [a, b] of data.connections) {
+      if (adjacency[a]) adjacency[a].push(b);
+      if (adjacency[b]) adjacency[b].push(a);
+    }
+  }
+
+  function canAllocate(id){
+    const node = nodeMap[id];
+    if (!node) return false;
+    if (node.type === "start") return id === data.activeStartId;
+    if (node.allocated) return true;
+    return adjacency[id].some(nid => nodeMap[nid] && nodeMap[nid].allocated);
+  }
+
+  function refundBlocked(id){
+    const node = nodeMap[id];
+    if (!node || node.type === "start") return true;
+
+    const active = {};
+    for (const n of data.nodes) {
+      if (n.allocated && n.id !== id) active[n.id] = true;
+    }
+    if (data.activeStartId) active[data.activeStartId] = true;
+
+    const queue = [data.activeStartId];
+    const seen = {};
+    if (data.activeStartId) seen[data.activeStartId] = true;
+
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const next of (adjacency[cur] || [])) {
+        if (active[next] && !seen[next]) {
+          seen[next] = true;
+          queue.push(next);
+        }
+      }
+    }
+
+    for (const key in active) {
+      if (!seen[key]) return true;
+    }
+    return false;
+  }
+
+  function toggleNode(id){
+    const node = nodeMap[id];
+    if (!node) return;
+
+    if (node.type === "start") return;
+
+    if (!node.allocated) {
+      if (!canAllocate(id)) return;
+      node.allocated = true;
+    } else {
+      if (refundBlocked(id)) return;
+      node.allocated = false;
+    }
+    renderState();
+  }
+
+  function renderRings(){
+    ringsLayer.innerHTML = "";
+    for (const ring of data.mainRings) {
+      const c = createSvg("circle");
+      c.setAttribute("class", "main-ring");
+      c.setAttribute("cx", CENTER.x);
+      c.setAttribute("cy", CENTER.y);
+      c.setAttribute("r", ring.radius);
+      ringsLayer.appendChild(c);
+    }
+    for (const sub of data.subRings) {
+      const cpos = getSubRingCenter(sub);
+      const c = createSvg("circle");
+      c.setAttribute("class", "sub-ring");
+      c.setAttribute("cx", cpos.x);
+      c.setAttribute("cy", cpos.y);
+      c.setAttribute("r", sub.radius);
+      ringsLayer.appendChild(c);
+    }
+  }
+
+  function renderConnections(){
+    connectionsLayer.innerHTML = "";
+    for (const [aId, bId] of data.connections) {
+      const a = nodeMap[aId];
+      const b = nodeMap[bId];
+      if (!a || !b) continue;
+      const line = createSvg("line");
+      line.setAttribute("class", "connection");
+      line.setAttribute("x1", a.x);
+      line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x);
+      line.setAttribute("y2", b.y);
+      line.dataset.a = aId;
+      line.dataset.b = bId;
+      connectionsLayer.appendChild(line);
+    }
+  }
+
+  function renderNodes(){
+    nodesLayer.innerHTML = "";
+    for (const node of data.nodes) {
+      const g = createSvg("g");
+      let cls = "node";
+      if (node.allocated) cls += " active";
+      if (node.type === "start") cls += " start";
+      if (node.type === "start" && data.activeStartId && node.id !== data.activeStartId) cls += " disabled";
+      g.setAttribute("class", cls);
+
+      const r = Number(node.size || 14);
+
+      const outer = createSvg("circle");
+      outer.setAttribute("class", "outer");
+      outer.setAttribute("cx", node.x);
+      outer.setAttribute("cy", node.y);
+      outer.setAttribute("r", r + 5);
+
+      const core = createSvg("circle");
+      core.setAttribute("class", "core");
+      core.setAttribute("cx", node.x);
+      core.setAttribute("cy", node.y);
+      core.setAttribute("r", r);
+
+      g.appendChild(outer);
+      g.appendChild(core);
+      nodesLayer.appendChild(g);
+
+      g.addEventListener("mouseenter", e => showTooltip(e, node));
+      g.addEventListener("mousemove", moveTooltip);
+      g.addEventListener("mouseleave", hideTooltip);
+      g.addEventListener("click", function(evt){
+        evt.stopPropagation();
+        toggleNode(node.id);
+      });
+    }
+  }
+
+  function renderState(){
+    document.querySelectorAll(".connection").forEach(line => {
+      const a = nodeMap[line.dataset.a];
+      const b = nodeMap[line.dataset.b];
+      line.classList.toggle("active", !!(a && b && a.allocated && b.allocated));
+    });
+
+    let count = 0;
+    for (const node of data.nodes) {
+      if (node.allocated && node.type !== "start") count++;
+    }
+    allocatedCountEl.textContent = count;
+    const start = nodeMap[data.activeStartId];
+    activeStartLabel.textContent = start ? (start.name || start.id) : "None";
+
+    renderNodes();
+  }
+
+  function renderAll(){
+    applyPositions();
+    buildMaps();
+    renderRings();
+    renderConnections();
+    renderState();
+  }
+
+  function loadJSON(){
+    try {
+      const parsed = JSON.parse(jsonBox.value);
+      data = parsed;
+      if (!data.activeStartId) {
+        const start = data.nodes.find(n => n.type === "start");
+        data.activeStartId = start ? start.id : "";
+      }
+      for (const n of data.nodes) n.allocated = false;
+      if (data.activeStartId && nodeExists(data.activeStartId)) {
+        const startNode = data.nodes.find(n => n.id === data.activeStartId);
+        if (startNode) startNode.allocated = true;
+      }
+      renderAll();
+    } catch(e) {
+      alert("Invalid JSON");
+    }
+  }
+
+  function nodeExists(id){
+    return data.nodes.some(n => n.id === id);
+  }
+
+  function refundAll(){
+    for (const n of data.nodes) {
+      n.allocated = n.id === data.activeStartId;
+    }
+    renderState();
+  }
+
+  function applyTransform(){
+    viewport.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.scale})`);
+  }
+
+  function showTooltip(event, node){
+    tooltip.querySelector(".name").textContent = node.name || node.id;
+    tooltip.querySelector(".type").textContent = node.type || "node";
+    tooltip.querySelector(".desc").textContent = node.desc || "";
+    tooltip.classList.add("visible");
+    moveTooltip(event);
+  }
+
+  function moveTooltip(event){
+    tooltip.style.left = (event.clientX + 14) + "px";
+    tooltip.style.top = (event.clientY + 14) + "px";
+  }
+
+  function hideTooltip(){
+    tooltip.classList.remove("visible");
+  }
+
+  document.getElementById("loadBtn").addEventListener("click", loadJSON);
+  document.getElementById("refundBtn").addEventListener("click", refundAll);
+  document.getElementById("resetViewBtn").addEventListener("click", function(){
+    view.x = 0;
+    view.y = 0;
+    view.scale = 1;
+    applyTransform();
+  });
+
+  svg.addEventListener("mousedown", function(evt){
+    dragging = true;
+    svg.classList.add("dragging");
+    dragStartX = evt.clientX;
+    dragStartY = evt.clientY;
+    originX = view.x;
+    originY = view.y;
+  });
+
+  window.addEventListener("mousemove", function(evt){
+    if (!dragging) return;
+    const rect = svg.getBoundingClientRect();
+    const dx = (evt.clientX - dragStartX) * (1600 / rect.width);
+    const dy = (evt.clientY - dragStartY) * (1000 / rect.height);
+    view.x = originX + dx;
+    view.y = originY + dy;
+    applyTransform();
+  });
+
+  window.addEventListener("mouseup", function(){
+    dragging = false;
+    svg.classList.remove("dragging");
+  });
+
+  svg.addEventListener("wheel", function(e){
+    e.preventDefault();
+
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left) * (1600 / rect.width);
+    const mouseY = (e.clientY - rect.top) * (1000 / rect.height);
+
+    const worldX = (mouseX - view.x) / view.scale;
+    const worldY = (mouseY - view.y) / view.scale;
+
+    if (e.deltaY < 0) view.scale *= 1.1;
+    else view.scale *= 0.9;
+
+    if (view.scale < 0.35) view.scale = 0.35;
+    if (view.scale > 3.0) view.scale = 3.0;
+
+    view.x = mouseX - worldX * view.scale;
+    view.y = mouseY - worldY * view.scale;
+
+    applyTransform();
+  }, { passive:false });
+
+  data = defaultData();
+  jsonBox.value = JSON.stringify(data, null, 2);
+  renderAll();
+})();
+</script>
+</body>
+</html>

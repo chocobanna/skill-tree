@@ -1,0 +1,223 @@
+{
+  "mainRings": [
+    {
+      "id": "mr1",
+      "radius": 120
+    },
+    {
+      "id": "mr2",
+      "radius": 240
+    },
+    {
+      "id": "mr3",
+      "radius": 360
+    }
+  ],
+  "subRings": [
+    {
+      "id": "sr1",
+      "parentMainRingId": "mr2",
+      "anchorAngleDeg": 90,
+      "radius": 75
+    },
+    {
+      "id": "sr2",
+      "parentMainRingId": "mr2",
+      "anchorAngleDeg": 150,
+      "radius": 75
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Combat Form : Basic",
+      "desc": "A warriors basic combat form allowing for a better moveset.",
+      "type": "keystone",
+      "size": 14,
+      "orbitType": "sub",
+      "mainRingId": "mr2",
+      "subRingId": "sr1",
+      "angleDeg": 190,
+      "radiusOffset": 0,
+      "x": 726.1394185240844,
+      "y": 726.9763866749802
+    },
+    {
+      "id": "n2",
+      "name": "Warrior",
+      "desc": "The path of a warrior :\n+ 5 STR\n+ 5 HP",
+      "type": "start",
+      "size": 18,
+      "orbitType": "main",
+      "mainRingId": "mr1",
+      "subRingId": "",
+      "angleDeg": 90,
+      "radiusOffset": 0,
+      "x": 800,
+      "y": 620
+    },
+    {
+      "id": "n102",
+      "name": "Strength Training",
+      "desc": "Training your strength to better handle weapons :\n+ 10 STR\n+ 5 DEX",
+      "type": "normal",
+      "size": 14,
+      "orbitType": "sub",
+      "mainRingId": "mr1",
+      "subRingId": "sr1",
+      "angleDeg": 350,
+      "radiusOffset": 0,
+      "x": 873.8605814759156,
+      "y": 726.9763866749802
+    },
+    {
+      "id": "n103",
+      "name": "Swordsmanship : Basic",
+      "desc": "A basic sword form :\n- Basic Sword For ",
+      "type": "keystone",
+      "size": 16,
+      "orbitType": "sub",
+      "mainRingId": "mr1",
+      "subRingId": "sr1",
+      "angleDeg": 90,
+      "radiusOffset": 0,
+      "x": 800,
+      "y": 815
+    },
+    {
+      "id": "n104",
+      "name": "Mage",
+      "desc": "The path of the mage :\n+ 10 INT",
+      "type": "start",
+      "size": 18,
+      "orbitType": "main",
+      "mainRingId": "mr1",
+      "subRingId": "",
+      "angleDeg": 150,
+      "radiusOffset": 0,
+      "x": 696.0769515458674,
+      "y": 560
+    },
+    {
+      "id": "n105",
+      "name": "Torsion Training",
+      "desc": "Muscle training focusing on torsion: +10 STR +10 DEX",
+      "type": "normal",
+      "size": 14,
+      "orbitType": "main",
+      "mainRingId": "mr3",
+      "subRingId": "",
+      "angleDeg": 60,
+      "radiusOffset": 0,
+      "x": 980,
+      "y": 811.7691453623979
+    },
+    {
+      "id": "n106",
+      "name": "Flexibility Training",
+      "desc": "Training focusing on flexibility : +15 DEX +5 STR",
+      "type": "normal",
+      "size": 14,
+      "orbitType": "main",
+      "mainRingId": "mr3",
+      "subRingId": "",
+      "angleDeg": 80,
+      "radiusOffset": 0,
+      "x": 862.513343960095,
+      "y": 854.5307910843949
+    },
+    {
+      "id": "n107",
+      "name": "Mana Core : First Stage",
+      "desc": "A first stage mama core : +10 INT",
+      "type": "keystone",
+      "size": 14,
+      "orbitType": "sub",
+      "mainRingId": "mr2",
+      "subRingId": "sr2",
+      "angleDeg": 50,
+      "radiusOffset": 0,
+      "x": 640.3629738182252,
+      "y": 677.4533332339233
+    },
+    {
+      "id": "n108",
+      "name": "Spellcasting : First Stage",
+      "desc": "Basic spellcasting.",
+      "type": "notable",
+      "size": 14,
+      "orbitType": "sub",
+      "mainRingId": "mr3",
+      "subRingId": "sr2",
+      "angleDeg": 150,
+      "radiusOffset": 0,
+      "x": 527.2019978079018,
+      "y": 657.5
+    },
+    {
+      "id": "n109",
+      "name": "Mana Focus : First Stage",
+      "desc": "Better focus for more efficient mana use: +15 INT",
+      "type": "notable",
+      "size": 14,
+      "orbitType": "sub",
+      "mainRingId": "mr1",
+      "subRingId": "sr2",
+      "angleDeg": 250,
+      "radiusOffset": 0,
+      "x": 566.5023923423095,
+      "y": 549.5230534410568
+    }
+  ],
+  "connections": [
+    [
+      "n2",
+      "n1"
+    ],
+    [
+      "n2",
+      "n102"
+    ],
+    [
+      "n1",
+      "n103"
+    ],
+    [
+      "n102",
+      "n103"
+    ],
+    [
+      "n102",
+      "n105"
+    ],
+    [
+      "n102",
+      "n106"
+    ],
+    [
+      "n106",
+      "n105"
+    ],
+    [
+      "n104",
+      "n107"
+    ],
+    [
+      "n1",
+      "n107"
+    ],
+    [
+      "n107",
+      "n108"
+    ],
+    [
+      "n109",
+      "n108"
+    ],
+    [
+      "n109",
+      "n104"
+    ]
+  ],
+  "activeStartId": ""
+}
