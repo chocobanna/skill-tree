@@ -1,223 +1,83 @@
 {
+  "attributes": [
+    {"id": "str", "name": "Strength"},
+    {"id": "dex", "name": "Dexterity"},
+    {"id": "int", "name": "Intelligence"},
+    {"id": "hp", "name": "Health"},
+    {"id": "craft", "name": "Craftsmanship"}
+  ],
+
   "mainRings": [
-    {
-      "id": "mr1",
-      "radius": 120
-    },
-    {
-      "id": "mr2",
-      "radius": 240
-    },
-    {
-      "id": "mr3",
-      "radius": 360
-    }
+    {"id": "mr1", "radius": 120},
+    {"id": "mr2", "radius": 240},
+    {"id": "mr3", "radius": 360},
+    {"id": "mr4", "radius": 480},
+    {"id": "mr5", "radius": 600}
   ],
-  "subRings": [
-    {
-      "id": "sr1",
-      "parentMainRingId": "mr2",
-      "anchorAngleDeg": 90,
-      "radius": 75
-    },
-    {
-      "id": "sr2",
-      "parentMainRingId": "mr2",
-      "anchorAngleDeg": 150,
-      "radius": 75
-    }
-  ],
+
+  "subRings": [],
+
   "nodes": [
-    {
-      "id": "n1",
-      "name": "Combat Form : Basic",
-      "desc": "A warriors basic combat form allowing for a better moveset.",
-      "type": "keystone",
-      "size": 14,
-      "orbitType": "sub",
-      "mainRingId": "mr2",
-      "subRingId": "sr1",
-      "angleDeg": 190,
-      "radiusOffset": 0,
-      "x": 726.1394185240844,
-      "y": 726.9763866749802
-    },
-    {
-      "id": "n2",
-      "name": "Warrior",
-      "desc": "The path of a warrior :\n+ 5 STR\n+ 5 HP",
-      "type": "start",
-      "size": 18,
-      "orbitType": "main",
-      "mainRingId": "mr1",
-      "subRingId": "",
-      "angleDeg": 90,
-      "radiusOffset": 0,
-      "x": 800,
-      "y": 620
-    },
-    {
-      "id": "n102",
-      "name": "Strength Training",
-      "desc": "Training your strength to better handle weapons :\n+ 10 STR\n+ 5 DEX",
-      "type": "normal",
-      "size": 14,
-      "orbitType": "sub",
-      "mainRingId": "mr1",
-      "subRingId": "sr1",
-      "angleDeg": 350,
-      "radiusOffset": 0,
-      "x": 873.8605814759156,
-      "y": 726.9763866749802
-    },
-    {
-      "id": "n103",
-      "name": "Swordsmanship : Basic",
-      "desc": "A basic sword form :\n- Basic Sword For ",
-      "type": "keystone",
-      "size": 16,
-      "orbitType": "sub",
-      "mainRingId": "mr1",
-      "subRingId": "sr1",
-      "angleDeg": 90,
-      "radiusOffset": 0,
-      "x": 800,
-      "y": 815
-    },
-    {
-      "id": "n104",
-      "name": "Mage",
-      "desc": "The path of the mage :\n+ 10 INT",
-      "type": "start",
-      "size": 18,
-      "orbitType": "main",
-      "mainRingId": "mr1",
-      "subRingId": "",
-      "angleDeg": 150,
-      "radiusOffset": 0,
-      "x": 696.0769515458674,
-      "y": 560
-    },
-    {
-      "id": "n105",
-      "name": "Torsion Training",
-      "desc": "Muscle training focusing on torsion: +10 STR +10 DEX",
-      "type": "normal",
-      "size": 14,
-      "orbitType": "main",
-      "mainRingId": "mr3",
-      "subRingId": "",
-      "angleDeg": 60,
-      "radiusOffset": 0,
-      "x": 980,
-      "y": 811.7691453623979
-    },
-    {
-      "id": "n106",
-      "name": "Flexibility Training",
-      "desc": "Training focusing on flexibility : +15 DEX +5 STR",
-      "type": "normal",
-      "size": 14,
-      "orbitType": "main",
-      "mainRingId": "mr3",
-      "subRingId": "",
-      "angleDeg": 80,
-      "radiusOffset": 0,
-      "x": 862.513343960095,
-      "y": 854.5307910843949
-    },
-    {
-      "id": "n107",
-      "name": "Mana Core : First Stage",
-      "desc": "A first stage mama core : +10 INT",
-      "type": "keystone",
-      "size": 14,
-      "orbitType": "sub",
-      "mainRingId": "mr2",
-      "subRingId": "sr2",
-      "angleDeg": 50,
-      "radiusOffset": 0,
-      "x": 640.3629738182252,
-      "y": 677.4533332339233
-    },
-    {
-      "id": "n108",
-      "name": "Spellcasting : First Stage",
-      "desc": "Basic spellcasting.",
-      "type": "notable",
-      "size": 14,
-      "orbitType": "sub",
-      "mainRingId": "mr3",
-      "subRingId": "sr2",
-      "angleDeg": 150,
-      "radiusOffset": 0,
-      "x": 527.2019978079018,
-      "y": 657.5
-    },
-    {
-      "id": "n109",
-      "name": "Mana Focus : First Stage",
-      "desc": "Better focus for more efficient mana use: +15 INT",
-      "type": "notable",
-      "size": 14,
-      "orbitType": "sub",
-      "mainRingId": "mr1",
-      "subRingId": "sr2",
-      "angleDeg": 250,
-      "radiusOffset": 0,
-      "x": 566.5023923423095,
-      "y": 549.5230534410568
-    }
+    {"id":"n1","name":"Warrior Start","type":"start","orbitType":"main","mainRingId":"mr1","angleDeg":-90,"radiusOffset":0,"size":18,"bonuses":{"str":2,"hp":5}},
+    {"id":"n2","name":"Mage Start","type":"start","orbitType":"main","mainRingId":"mr1","angleDeg":0,"radiusOffset":0,"size":18,"bonuses":{"int":2}},
+    {"id":"n3","name":"Rogue Start","type":"start","orbitType":"main","mainRingId":"mr1","angleDeg":90,"radiusOffset":0,"size":18,"bonuses":{"dex":2}},
+    {"id":"n4","name":"Craftsman Start","type":"start","orbitType":"main","mainRingId":"mr1","angleDeg":180,"radiusOffset":0,"size":18,"bonuses":{"craft":2}},
+
+    {"id":"n5","name":"Iron Muscles","orbitType":"main","mainRingId":"mr2","angleDeg":-110,"bonuses":{"str":3},"requirements":{"points":1}},
+    {"id":"n6","name":"Heavy Bones","orbitType":"main","mainRingId":"mr2","angleDeg":-100,"bonuses":{"hp":10},"requirements":{"points":1}},
+    {"id":"n7","name":"Battle Discipline","orbitType":"main","mainRingId":"mr2","angleDeg":-80,"bonuses":{"str":2},"requirements":{"points":2}},
+    {"id":"n8","name":"Weapon Mastery","orbitType":"main","mainRingId":"mr3","angleDeg":-90,"bonuses":{"str":5},"requirements":{"points":4}},
+    {"id":"n9","name":"Juggernaut","orbitType":"main","mainRingId":"mr4","angleDeg":-90,"bonuses":{"hp":25},"requirements":{"points":8}},
+    {"id":"n10","name":"Titan Strength","orbitType":"main","mainRingId":"mr5","angleDeg":-90,"bonuses":{"str":10},"requirements":{"points":15}},
+
+    {"id":"n11","name":"Arcane Mind","orbitType":"main","mainRingId":"mr2","angleDeg":-10,"bonuses":{"int":3},"requirements":{"points":1}},
+    {"id":"n12","name":"Mana Flow","orbitType":"main","mainRingId":"mr2","angleDeg":10,"bonuses":{"int":2},"requirements":{"points":1}},
+    {"id":"n13","name":"Spellcraft","orbitType":"main","mainRingId":"mr3","angleDeg":0,"bonuses":{"int":5},"requirements":{"points":4}},
+    {"id":"n14","name":"Elemental Adept","orbitType":"main","mainRingId":"mr4","angleDeg":0,"bonuses":{"int":8},"requirements":{"points":8}},
+    {"id":"n15","name":"Archmage","orbitType":"main","mainRingId":"mr5","angleDeg":0,"bonuses":{"int":12},"requirements":{"points":15}},
+
+    {"id":"n16","name":"Quick Hands","orbitType":"main","mainRingId":"mr2","angleDeg":100,"bonuses":{"dex":3},"requirements":{"points":1}},
+    {"id":"n17","name":"Silent Step","orbitType":"main","mainRingId":"mr2","angleDeg":80,"bonuses":{"dex":2},"requirements":{"points":1}},
+    {"id":"n18","name":"Backstab","orbitType":"main","mainRingId":"mr3","angleDeg":90,"bonuses":{"dex":5},"requirements":{"points":4}},
+    {"id":"n19","name":"Shadow Killer","orbitType":"main","mainRingId":"mr4","angleDeg":90,"bonuses":{"dex":8},"requirements":{"points":8}},
+    {"id":"n20","name":"Phantom Blade","orbitType":"main","mainRingId":"mr5","angleDeg":90,"bonuses":{"dex":12},"requirements":{"points":15}},
+
+    {"id":"n21","name":"Basic Smithing","orbitType":"main","mainRingId":"mr2","angleDeg":170,"bonuses":{"craft":3},"requirements":{"points":1}},
+    {"id":"n22","name":"Tool Mastery","orbitType":"main","mainRingId":"mr2","angleDeg":190,"bonuses":{"craft":2},"requirements":{"points":1}},
+    {"id":"n23","name":"Master Artisan","orbitType":"main","mainRingId":"mr3","angleDeg":180,"bonuses":{"craft":5},"requirements":{"points":4}},
+    {"id":"n24","name":"Legendary Forge","orbitType":"main","mainRingId":"mr4","angleDeg":180,"bonuses":{"craft":8},"requirements":{"points":8}},
+    {"id":"n25","name":"Grand Architect","orbitType":"main","mainRingId":"mr5","angleDeg":180,"bonuses":{"craft":12},"requirements":{"points":15}},
+
+    {"id":"n26","name":"Battle Mage","orbitType":"main","mainRingId":"mr3","angleDeg":-45,"bonuses":{"str":3,"int":3},"requirements":{"points":6}},
+    {"id":"n27","name":"Spellblade","orbitType":"main","mainRingId":"mr4","angleDeg":-45,"bonuses":{"str":4,"int":4},"requirements":{"points":10}},
+
+    {"id":"n28","name":"Shadow Mage","orbitType":"main","mainRingId":"mr3","angleDeg":45,"bonuses":{"dex":3,"int":3},"requirements":{"points":6}},
+    {"id":"n29","name":"Night Sorcerer","orbitType":"main","mainRingId":"mr4","angleDeg":45,"bonuses":{"dex":4,"int":4},"requirements":{"points":10}},
+
+    {"id":"n30","name":"Battle Engineer","orbitType":"main","mainRingId":"mr3","angleDeg":-160,"bonuses":{"str":3,"craft":3},"requirements":{"points":6}},
+    {"id":"n31","name":"War Architect","orbitType":"main","mainRingId":"mr4","angleDeg":-160,"bonuses":{"str":4,"craft":4},"requirements":{"points":10}},
+
+    {"id":"n32","name":"Trap Master","orbitType":"main","mainRingId":"mr3","angleDeg":160,"bonuses":{"dex":3,"craft":3},"requirements":{"points":6}},
+    {"id":"n33","name":"Mechanist","orbitType":"main","mainRingId":"mr4","angleDeg":160,"bonuses":{"dex":4,"craft":4},"requirements":{"points":10}},
+
+    {"id":"n34","name":"Heroic Constitution","orbitType":"main","mainRingId":"mr3","angleDeg":-120,"bonuses":{"hp":20},"requirements":{"points":5}},
+    {"id":"n35","name":"Arcane Vitality","orbitType":"main","mainRingId":"mr3","angleDeg":-30,"bonuses":{"hp":15,"int":2},"requirements":{"points":5}},
+    {"id":"n36","name":"Elusive Survivor","orbitType":"main","mainRingId":"mr3","angleDeg":120,"bonuses":{"hp":15,"dex":2},"requirements":{"points":5}},
+    {"id":"n37","name":"Forge Endurance","orbitType":"main","mainRingId":"mr3","angleDeg":210,"bonuses":{"hp":20,"craft":2},"requirements":{"points":5}}
   ],
+
   "connections": [
-    [
-      "n2",
-      "n1"
-    ],
-    [
-      "n2",
-      "n102"
-    ],
-    [
-      "n1",
-      "n103"
-    ],
-    [
-      "n102",
-      "n103"
-    ],
-    [
-      "n102",
-      "n105"
-    ],
-    [
-      "n102",
-      "n106"
-    ],
-    [
-      "n106",
-      "n105"
-    ],
-    [
-      "n104",
-      "n107"
-    ],
-    [
-      "n1",
-      "n107"
-    ],
-    [
-      "n107",
-      "n108"
-    ],
-    [
-      "n109",
-      "n108"
-    ],
-    [
-      "n109",
-      "n104"
-    ]
-  ],
-  "activeStartId": ""
+    ["n1","n5"],["n5","n6"],["n6","n7"],["n7","n8"],["n8","n9"],["n9","n10"],
+    ["n2","n11"],["n11","n12"],["n12","n13"],["n13","n14"],["n14","n15"],
+    ["n3","n16"],["n16","n17"],["n17","n18"],["n18","n19"],["n19","n20"],
+    ["n4","n21"],["n21","n22"],["n22","n23"],["n23","n24"],["n24","n25"],
+
+    ["n7","n26"],["n13","n26"],["n26","n27"],
+    ["n17","n28"],["n13","n28"],["n28","n29"],
+    ["n7","n30"],["n23","n30"],["n30","n31"],
+    ["n17","n32"],["n23","n32"],["n32","n33"],
+
+    ["n8","n34"],["n13","n35"],["n18","n36"],["n23","n37"],
+    ["n34","n27"],["n35","n29"],["n36","n33"],["n37","n31"]
+  ]
 }

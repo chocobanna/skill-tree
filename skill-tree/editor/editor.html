@@ -24,6 +24,21 @@
     --disabled:0.28;
   }
 
+  @keyframes startPulse{
+    0%{
+      filter:drop-shadow(0 0 0 rgba(120,255,170,0));
+      transform:scale(1);
+    }
+    50%{
+      filter:drop-shadow(0 0 12px rgba(120,255,170,0.6));
+      transform:scale(1.06);
+    }
+    100%{
+      filter:drop-shadow(0 0 0 rgba(120,255,170,0));
+      transform:scale(1);
+    }
+  }
+
   *{ box-sizing:border-box; }
 
   html,body{
@@ -222,6 +237,18 @@
     cursor:pointer;
   }
 
+  .main-ring-handle{
+    fill:rgba(255,210,120,0.2);
+    stroke:#ffd48a;
+    stroke-width:2;
+    cursor:pointer;
+  }
+
+  .main-ring-handle.selected{
+    stroke:#fff;
+    stroke-width:3;
+  }
+
   .node .outer{
     fill:rgba(10,12,18,0.95);
     stroke:rgba(255,213,129,0.18);
@@ -276,9 +303,18 @@
     <h3>EDITOR</h3>
 
     <div class="row">
+      <button id="modeNodesBtn">Node Mode</button>
+      <button id="modeRingsBtn">Ring Mode</button>
+    </div>
+
+    <div id="nodeEditorUI">
+
+    <div class="row">
       <button id="modeSelectBtn">Select</button>
       <button id="modeAddBtn">Add Node</button>
       <button id="modeConnectBtn">Connect</button>
+      <button id="modeDisconnectBtn">Disconnect</button>
+
     </div>
 
     <div class="row">
@@ -289,7 +325,6 @@
 
     <div class="row">
       <button id="deleteNodeBtn">Delete Node</button>
-      <button id="deleteSubringBtn">Delete Subring</button>
       <button id="deleteLinkBtn">Delete Last Link</button>
     </div>
 
@@ -376,7 +411,11 @@
 
     <hr>
 
+    </div>
+
+    <div id="ringEditorUI">
     <h3>RINGS</h3>
+
 
     <div class="row">
       <div>
@@ -415,6 +454,17 @@
 
     <hr>
 
+    <h3>ATTRIBUTES</h3>
+
+    <div class="row">
+      <input id="newAttrId" placeholder="id (str)">
+      <input id="newAttrName" placeholder="Name">
+      <button id="addAttrBtn">Add</button>
+    </div>
+
+
+    </div>
+
     <div class="row">
       <button id="exportBtn">Export JSON</button>
       <button id="importBtn">Import JSON</button>
@@ -422,6 +472,7 @@
   </div>
 
   <div id="properties" class="panel">
+    <div id="nodePropertiesUI">
     <h3>NODE PROPERTIES</h3>
 
     <label>Name</label>
@@ -485,18 +536,65 @@
       <button id="resnapBtn">Resnap</button>
     </div>
 
+    
     <hr>
 
-    <h3>STARTS</h3>
+    <h3>NODE BONUSES</h3>
 
-    <label>Active start</label>
-    <select id="activeStartSelect"></select>
+    <div id="bonusEditor"></div>
 
-    <div class="mini">
-      You can place multiple start nodes, but once an active start is chosen the others are disabled.
+    <div class="row">
+      <select id="bonusAttrSelect"></select>
+      <input id="bonusValueInput" type="number" value="1">
+      <button id="addBonusBtn">Add</button>
     </div>
 
     <hr>
+
+    <h3>NODE REQUIREMENTS</h3>
+
+    <div class="row">
+      <label>Points required</label>
+      <input id="reqPoints" type="number" value="0">
+    </div>
+
+    <div id="reqAttrEditor"></div>
+
+    <div class="row">
+      <select id="reqAttrSelect"></select>
+      <input id="reqAttrValue" type="number" value="1">
+      <button id="addReqAttrBtn">Add</button>
+    </div>
+
+    </div>
+
+    <div id="ringPropertiesUI">
+    <h3>MAIN RING</h3>
+
+    <div class="row">
+      <div>
+        <label>Select ring</label>
+        <select id="selectedMainRing"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Radius</label>
+        <input id="mainRingRadiusEdit" type="number">
+      </div>
+      <div>
+        <button id="applyMainRingBtn">Apply</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="deleteMainRingBtn">Delete Ring</button>
+    </div>
+
+
+    <hr>
+
 
     <h3>SUBRING PROPERTIES</h3>
 
@@ -528,6 +626,7 @@
         <button id="applySubringBtn">Apply</button>
       </div>
     </div>
+    </div>
   </div>
 
   <div id="ioPanel">
@@ -540,7 +639,8 @@
 
   <svg id="canvas" viewBox="0 0 1600 1000">
     <g id="viewport">
-      <g id="ringsLayer"></g>
+      <g id="ringGuidesLayer"></g>
+      <g id="ringHandlesLayer"></g>
       <g id="connectionsLayer"></g>
       <g id="nodesLayer"></g>
     </g>
@@ -551,7 +651,8 @@
 (function(){
   const svg = document.getElementById("canvas");
   const viewport = document.getElementById("viewport");
-  const ringsLayer = document.getElementById("ringsLayer");
+  const ringGuidesLayer = document.getElementById("ringGuidesLayer");
+  const ringHandlesLayer = document.getElementById("ringHandlesLayer");
   const connectionsLayer = document.getElementById("connectionsLayer");
   const nodesLayer = document.getElementById("nodesLayer");
   const jsonBox = document.getElementById("jsonBox");
@@ -566,8 +667,19 @@
     redoBtn: document.getElementById("redoBtn"),
     resetViewBtn: document.getElementById("resetViewBtn"),
     deleteNodeBtn: document.getElementById("deleteNodeBtn"),
-    deleteSubringBtn: document.getElementById("deleteSubringBtn"),
     deleteLinkBtn: document.getElementById("deleteLinkBtn"),
+    modeDisconnectBtn: document.getElementById("modeDisconnectBtn"),
+
+    bonusEditor: document.getElementById("bonusEditor"),
+    bonusAttrSelect: document.getElementById("bonusAttrSelect"),
+    bonusValueInput: document.getElementById("bonusValueInput"),
+    addBonusBtn: document.getElementById("addBonusBtn"),
+    newAttrId: document.getElementById("newAttrId"),
+    newAttrName: document.getElementById("newAttrName"),
+    addAttrBtn: document.getElementById("addAttrBtn"),
+
+
+    deleteMainRingBtn: document.getElementById("deleteMainRingBtn"),
 
     snapEnabled: document.getElementById("snapEnabled"),
     angleSnap: document.getElementById("angleSnap"),
@@ -602,25 +714,48 @@
     applyPropsBtn: document.getElementById("applyPropsBtn"),
     resnapBtn: document.getElementById("resnapBtn"),
 
-    activeStartSelect: document.getElementById("activeStartSelect"),
-
     selectedSubringSelect: document.getElementById("selectedSubringSelect"),
     subringParentEdit: document.getElementById("subringParentEdit"),
     subringAngleEdit: document.getElementById("subringAngleEdit"),
     subringRadiusEdit: document.getElementById("subringRadiusEdit"),
-    applySubringBtn: document.getElementById("applySubringBtn")
+    applySubringBtn: document.getElementById("applySubringBtn"),
+
+    reqPoints: document.getElementById("reqPoints"),
+    reqAttrEditor: document.getElementById("reqAttrEditor"),
+    reqAttrSelect: document.getElementById("reqAttrSelect"),
+    reqAttrValue: document.getElementById("reqAttrValue"),
+    addReqAttrBtn: document.getElementById("addReqAttrBtn"),
+
+    modeNodesBtn: document.getElementById("modeNodesBtn"),
+    modeRingsBtn: document.getElementById("modeRingsBtn"),
   };
+
+  const nodeEditorUI = document.getElementById("nodeEditorUI");
+  const ringEditorUI = document.getElementById("ringEditorUI");
+
+  const nodePropertiesUI = document.getElementById("nodePropertiesUI");
+  const ringPropertiesUI = document.getElementById("ringPropertiesUI");
+
+  const selectedMainRing = document.getElementById("selectedMainRing");
+  const mainRingRadiusEdit = document.getElementById("mainRingRadiusEdit");
+  const applyMainRingBtn = document.getElementById("applyMainRingBtn");
+
 
   let mode = "select";
   let selectedNodeId = null;
   let selectedSubringId = null;
   let connectStartId = null;
 
+  let ringsDirty = true;
+
+  let selectedMainRingId = null;
   let dragState = null;
   let panState = { dragging:false, startX:0, startY:0, originX:0, originY:0 };
   const view = { x:0, y:0, scale:1 };
 
   let idCounter = 100;
+
+  let editMode = "rings";
 
   let data = defaultData();
   let history = [];
@@ -628,6 +763,12 @@
 
   function defaultData(){
     return {
+      attributes: [
+        { id:"str", name:"Strength" },
+        { id:"dex", name:"Dexterity" },
+        { id:"int", name:"Intelligence" },
+        { id:"hp",  name:"Health" }
+      ],
       mainRings: [
         { id:"mr1", radius:120 },
         { id:"mr2", radius:240 },
@@ -649,7 +790,8 @@
           subRingId:"",
           angleDeg:-90,
           radiusOffset:0,
-          x:0, y:0
+          x:0, y:0,
+          bonuses: {}
         },
         {
           id:"n2",
@@ -662,13 +804,36 @@
           subRingId:"",
           angleDeg:90,
           radiusOffset:0,
-          x:0, y:0
+          x:0, y:0,
+          bonuses: {}
         }
       ],
       connections: [],
-      activeStartId: "n1"
     };
   }
+   
+  function setEditMode(m){
+
+    editMode = m;
+    dragState = null;
+
+    els.modeNodesBtn.classList.toggle("activeMode", m === "nodes");
+    els.modeRingsBtn.classList.toggle("activeMode", m === "rings");
+
+    const nodeMode = (m === "nodes");
+
+    nodeEditorUI.style.display = nodeMode ? "block" : "none";
+    nodePropertiesUI.style.display = nodeMode ? "block" : "none";
+
+    ringEditorUI.style.display = nodeMode ? "none" : "block";
+    ringPropertiesUI.style.display = nodeMode ? "none" : "block";
+
+    selectedNodeId = null;
+    selectedSubringId = null;
+
+    render();
+  }
+
 
   function deepClone(obj){
     return JSON.parse(JSON.stringify(obj));
@@ -722,6 +887,30 @@
     return data.mainRings.find(r => r.id === id) || null;
   }
 
+  function getClosestMainRing(point){
+
+    let closest = null;
+    let bestDist = Infinity;
+
+    for (const ring of data.mainRings){
+
+      const dx = point.x - CENTER.x;
+      const dy = point.y - CENTER.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      const diff = Math.abs(dist - ring.radius);
+
+      if (diff < bestDist){
+        bestDist = diff;
+        closest = ring;
+      }
+
+    }
+
+    return closest;
+  }
+
+
   function getSubRing(id){
     return data.subRings.find(r => r.id === id) || null;
   }
@@ -744,13 +933,17 @@
     if (node.orbitType === "main") {
       const ring = getMainRing(node.mainRingId);
       if (!ring) return { x:CENTER.x, y:CENTER.y };
+
       const r = ring.radius + Number(node.radiusOffset || 0);
       const a = degToRad(node.angleDeg);
+
       return {
         x: CENTER.x + Math.cos(a) * r,
         y: CENTER.y + Math.sin(a) * r
       };
     }
+
+
 
     if (node.orbitType === "sub") {
       const sub = getSubRing(node.subRingId);
@@ -794,12 +987,59 @@
   function setMode(m){
     mode = m;
     connectStartId = null;
+
     els.modeSelectBtn.classList.toggle("activeMode", m === "select");
     els.modeAddBtn.classList.toggle("activeMode", m === "add");
     els.modeConnectBtn.classList.toggle("activeMode", m === "connect");
+    els.modeDisconnectBtn.classList.toggle("activeMode", m === "disconnect");
   }
 
+  function renderNodeBonuses(){
+
+    els.bonusEditor.innerHTML = "";
+
+    const node = data.nodes.find(n => n.id === selectedNodeId);
+    if (!node) return;
+
+    for (const attrId in node.bonuses){
+
+      const value = node.bonuses[attrId];
+
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const label = document.createElement("div");
+      label.textContent = attrId + " " + (value >= 0 ? "+" + value : value);
+
+      const btn = document.createElement("button");
+      btn.textContent = "Remove";
+
+      btn.onclick = function(){
+        delete node.bonuses[attrId];
+        saveHistory();
+        renderNodeBonuses();
+      };
+
+      row.appendChild(label);
+      row.appendChild(btn);
+
+      els.bonusEditor.appendChild(row);
+    }
+
+  }
+
+
   function populateSelectors(){
+    selectedMainRing.innerHTML = "";
+
+    for (const ring of data.mainRings) {
+      const opt = document.createElement("option");
+      opt.value = ring.id;
+      opt.textContent = `${ring.id} (${ring.radius})`;
+      selectedMainRing.appendChild(opt);
+    }
+
+
     const mainTargets = [els.addMainRing, els.newSubringParent, els.propMainRing, els.subringParentEdit];
     for (const select of mainTargets) {
       const current = select.value;
@@ -832,26 +1072,32 @@
       else select.value = "";
     }
 
-    const active = els.activeStartSelect.value;
-    els.activeStartSelect.innerHTML = "";
-    const none = document.createElement("option");
-    none.value = "";
-    none.textContent = "(none)";
-    els.activeStartSelect.appendChild(none);
-    for (const node of data.nodes.filter(n => n.type === "start")) {
-      const opt = document.createElement("option");
-      opt.value = node.id;
-      opt.textContent = node.name || node.id;
-      els.activeStartSelect.appendChild(opt);
-    }
-    els.activeStartSelect.value = data.activeStartId || "";
-    if (active && [...els.activeStartSelect.options].some(o => o.value === active)) {
-      els.activeStartSelect.value = active;
-    }
-
     if (selectedSubringId) {
       els.selectedSubringSelect.value = selectedSubringId;
       loadSubringProperties();
+    }
+
+    els.bonusAttrSelect.innerHTML = "";
+
+    for (const attr of data.attributes){
+
+      const opt = document.createElement("option");
+      opt.value = attr.id;
+      opt.textContent = attr.name;
+
+      els.bonusAttrSelect.appendChild(opt);
+
+    }
+
+    els.reqAttrSelect.innerHTML="";
+
+    for(const attr of data.attributes){
+
+      const opt=document.createElement("option");
+      opt.value=attr.id;
+      opt.textContent=attr.name;
+
+      els.reqAttrSelect.appendChild(opt);
     }
   }
 
@@ -867,12 +1113,50 @@
     els.propMainRing.value = node.mainRingId || "";
     els.propSubRing.value = node.subRingId || "";
     els.propRadiusOffset.value = Number(node.radiusOffset || 0);
+    if (!node.bonuses) node.bonuses = {};
+      renderNodeBonuses();
+    if(!node.requirements){
+      node.requirements={points:0,attributes:{}};
+    }
+
+    els.reqPoints.value=node.requirements.points || 0;
+
+    renderRequirementAttributes(node);
+  }
+
+  function renderRequirementAttributes(node){
+
+    els.reqAttrEditor.innerHTML="";
+
+    for(const attr in node.requirements.attributes){
+
+      const row=document.createElement("div");
+      row.className="row";
+
+      const label=document.createElement("div");
+      label.textContent=attr+" ≥ "+node.requirements.attributes[attr];
+
+      const remove=document.createElement("button");
+      remove.textContent="Remove";
+
+      remove.onclick=function(){
+        delete node.requirements.attributes[attr];
+        renderRequirementAttributes(node);
+        saveHistory();
+      };
+
+      row.appendChild(label);
+      row.appendChild(remove);
+
+      els.reqAttrEditor.appendChild(row);
+    }
   }
 
   function applyNodeProperties(){
     const node = data.nodes.find(n => n.id === selectedNodeId);
     if (!node) return;
 
+    node.requirements.points = Number(els.reqPoints.value || 0);
     node.name = els.propName.value;
     node.desc = els.propDesc.value;
     node.type = els.propType.value;
@@ -886,13 +1170,6 @@
     if (els.snapEnabled.checked) {
       node.angleDeg = snapDeg(node.angleDeg, Number(els.angleSnap.value));
       if (els.radiusMode.value === "strict") node.radiusOffset = 0;
-    }
-
-    if (node.type === "start" && !data.activeStartId) {
-      data.activeStartId = node.id;
-    }
-    if (node.type !== "start" && data.activeStartId === node.id) {
-      data.activeStartId = "";
     }
 
     refreshComputedPositions();
@@ -1003,7 +1280,9 @@
       type: els.addNodeType.value,
       size: Math.max(4, Number(els.addNodeSize.value || 14)),
       orbitType,
-      mainRingId: els.addMainRing.value,
+      mainRingId: els.addOrbitType.value === "main"
+        ? getClosestMainRing(point)?.id || ""
+        : els.addMainRing.value,
       subRingId: els.addSubRing.value,
       angleDeg: 0,
       radiusOffset: 0,
@@ -1011,8 +1290,29 @@
       y: point.y
     };
 
-    if (orbitType === "main") {
+    if (node.orbitType === "main") {
+
+      const dx = point.x - CENTER.x;
+      const dy = point.y - CENTER.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      let closestRing = null;
+      let bestDiff = Infinity;
+
+      for (const ring of data.mainRings){
+        const diff = Math.abs(dist - ring.radius);
+        if (diff < bestDiff){
+          bestDiff = diff;
+          closestRing = ring;
+        }
+      }
+
+      if (closestRing){
+        node.mainRingId = closestRing.id;
+      }
+
       const p = pointToMainOrbit(point, node.mainRingId, els.snapEnabled.checked);
+
       node.angleDeg = p.angleDeg;
       node.radiusOffset = p.radiusOffset;
       node.x = p.x;
@@ -1027,9 +1327,6 @@
     }
 
     data.nodes.push(node);
-    if (node.type === "start" && !data.activeStartId) {
-      data.activeStartId = node.id;
-    }
     selectedNodeId = node.id;
     selectedSubringId = null;
     populateSelectors();
@@ -1037,6 +1334,18 @@
     saveHistory();
     render();
   }
+
+  function moveMainRing(ring, point){
+
+    const dx = point.x - CENTER.x;
+    const dy = point.y - CENTER.y;
+
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    ring.radius = Math.max(10, dist);
+
+  }
+
 
   function moveNode(node, point){
     const snap = els.snapEnabled.checked;
@@ -1046,13 +1355,35 @@
       return;
     }
     if (node.orbitType === "main") {
-      const p = pointToMainOrbit(point, node.mainRingId, snap);
+
+      const dx = point.x - CENTER.x;
+      const dy = point.y - CENTER.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      let closestRing = null;
+      let bestDiff = Infinity;
+
+      for (const ring of data.mainRings){
+        const diff = Math.abs(dist - ring.radius);
+        if (diff < bestDiff){
+          bestDiff = diff;
+          closestRing = ring;
+        }
+      }
+
+      if (closestRing){
+        node.mainRingId = closestRing.id;
+      }
+
+      const p = pointToMainOrbit(point, node.mainRingId, els.snapEnabled.checked);
+
       node.angleDeg = p.angleDeg;
       node.radiusOffset = p.radiusOffset;
       node.x = p.x;
       node.y = p.y;
       return;
     }
+
     if (node.orbitType === "sub") {
       const p = pointToSubOrbit(point, node.subRingId, snap);
       node.angleDeg = p.angleDeg;
@@ -1075,15 +1406,44 @@
 
     data.nodes = data.nodes.filter(n => n.id !== selectedNodeId);
     data.connections = data.connections.filter(c => c[0] !== selectedNodeId && c[1] !== selectedNodeId);
-    if (data.activeStartId === selectedNodeId) {
-      const firstStart = data.nodes.find(n => n.type === "start");
-      data.activeStartId = firstStart ? firstStart.id : "";
-    }
     selectedNodeId = null;
     populateSelectors();
     saveHistory();
     render();
   }
+
+  function deleteSelectedMainRing(){
+
+    const ringId = selectedMainRing.value;
+
+    if (!ringId) return;
+
+    const hasNodes = data.nodes.some(n => n.mainRingId === ringId);
+
+    if (hasNodes){
+      alert("This ring still has nodes attached.");
+      return;
+    }
+
+    const hasSubrings = data.subRings.some(s => s.parentMainRingId === ringId);
+
+    if (hasSubrings){
+      alert("This ring still has subrings attached.");
+      return;
+    }
+
+    if (!confirm("Delete this main ring?")) return;
+
+    data.mainRings = data.mainRings.filter(r => r.id !== ringId);
+
+    selectedMainRingId = null;
+    ringsDirty = true;
+    populateSelectors();
+    refreshComputedPositions();
+    saveHistory();
+    render();
+  }
+
 
   function deleteSelectedSubring(){
     if (!selectedSubringId) return;
@@ -1094,6 +1454,7 @@
     }
     data.subRings = data.subRings.filter(s => s.id !== selectedSubringId);
     selectedSubringId = null;
+    ringsDirty = true;
     populateSelectors();
     saveHistory();
     render();
@@ -1105,6 +1466,7 @@
       id: "mr" + (data.mainRings.length + 1),
       radius
     });
+    ringsDirty = true;
     populateSelectors();
     saveHistory();
     render();
@@ -1118,6 +1480,7 @@
       anchorAngleDeg: Number(els.newSubringAngle.value || 0),
       radius: Math.max(10, Number(els.newSubringRadius.value || 75))
     });
+    ringsDirty = true;
     populateSelectors();
     saveHistory();
     render();
@@ -1147,7 +1510,8 @@
   }
 
   function drawRings(){
-    ringsLayer.innerHTML = "";
+    ringGuidesLayer.innerHTML = "";
+    ringHandlesLayer.innerHTML = "";
 
     for (const ring of data.mainRings) {
       const circle = createSvg("circle");
@@ -1155,7 +1519,35 @@
       circle.setAttribute("cx", CENTER.x);
       circle.setAttribute("cy", CENTER.y);
       circle.setAttribute("r", ring.radius);
-      ringsLayer.appendChild(circle);
+
+      ringGuidesLayer.appendChild(circle);
+
+      const handle = createSvg("circle");
+      handle.setAttribute(
+        "class",
+        "main-ring-handle" + (selectedMainRingId === ring.id ? " selected" : "")
+      );
+      handle.setAttribute("cx", CENTER.x + ring.radius);
+      handle.setAttribute("cy", CENTER.y);
+      handle.setAttribute("r", 8);
+
+      if (editMode === "rings"){
+        ringHandlesLayer.appendChild(handle);
+      }
+
+      handle.addEventListener("mousedown", function(evt){
+        if (editMode !== "rings") return;
+
+        evt.stopPropagation();
+        selectedMainRingId = ring.id;
+        selectedNodeId = null;
+        selectedSubringId = null;
+
+        dragState = {
+          kind: "mainRing",
+          id: ring.id
+        };
+      });
     }
 
     for (const sub of data.subRings) {
@@ -1167,23 +1559,28 @@
       link.setAttribute("y1", CENTER.y);
       link.setAttribute("x2", c.x);
       link.setAttribute("y2", c.y);
-      ringsLayer.appendChild(link);
 
       const circle = createSvg("circle");
       circle.setAttribute("class", "sub-ring");
       circle.setAttribute("cx", c.x);
       circle.setAttribute("cy", c.y);
       circle.setAttribute("r", sub.radius);
-      ringsLayer.appendChild(circle);
+
+      //ringGuidesLayer.appendChild(link);
+      ringGuidesLayer.appendChild(circle);
 
       const anchor = createSvg("circle");
       anchor.setAttribute("class", "sub-anchor" + (selectedSubringId === sub.id ? " selected" : ""));
       anchor.setAttribute("cx", c.x);
       anchor.setAttribute("cy", c.y);
       anchor.setAttribute("r", 8);
-      ringsLayer.appendChild(anchor);
+
+      if (editMode === "rings"){
+        ringHandlesLayer.appendChild(anchor);
+      }
 
       anchor.addEventListener("mousedown", function(evt){
+        if (editMode !== "rings") return;
         evt.stopPropagation();
         selectedSubringId = sub.id;
         selectedNodeId = null;
@@ -1194,6 +1591,7 @@
       });
 
       anchor.addEventListener("click", function(evt){
+        if (editMode !== "rings") return;
         evt.stopPropagation();
         selectedSubringId = sub.id;
         selectedNodeId = null;
@@ -1203,6 +1601,7 @@
       });
     }
   }
+
 
   function drawConnections(){
     connectionsLayer.innerHTML = "";
@@ -1228,7 +1627,6 @@
       let cls = "node";
       if (node.id === selectedNodeId) cls += " selected";
       if (node.type === "start") cls += " start";
-      if (node.type === "start" && data.activeStartId && node.id !== data.activeStartId) cls += " disabled";
       g.setAttribute("class", cls);
 
       const r = nodeRadius(node.type, node.size);
@@ -1258,14 +1656,14 @@
 
       g.addEventListener("mousedown", function(evt){
         evt.stopPropagation();
-        if (mode === "select") {
+        if (editMode === "nodes" && mode === "select") {
           selectedNodeId = node.id;
           selectedSubringId = null;
           populateSelectors();
           loadNodeProperties();
           dragState = { kind:"node", id:node.id };
           render();
-        } else if (mode === "connect") {
+        } else if (editMode === "nodes" && mode === "connect") {
           if (!connectStartId) {
             connectStartId = node.id;
           } else if (connectStartId !== node.id) {
@@ -1278,7 +1676,25 @@
             saveHistory();
             render();
           }
+        } else if (editMode === "nodes" && mode === "disconnect") {
+
+          if (!connectStartId) {
+            connectStartId = node.id;
+          } else if (connectStartId !== node.id) {
+            data.connections = data.connections.filter(c =>
+              !(
+                (c[0] === connectStartId && c[1] === node.id) ||
+                (c[0] === node.id && c[1] === connectStartId)
+              )
+            );
+
+            connectStartId = null;
+            saveHistory();
+            render();
+          }
+
         }
+
       });
 
       g.addEventListener("click", function(evt){
@@ -1295,17 +1711,24 @@
   }
 
   function render(){
+
     refreshComputedPositions();
     applyTransform();
-    drawRings();
+
+    if (ringsDirty){
+      drawRings();
+      ringsDirty = false;
+    }
     drawConnections();
     drawNodes();
   }
 
+
+
   svg.addEventListener("mousedown", function(evt){
     const point = screenToSvg(evt);
 
-    if (mode === "add") {
+    if (editMode === "nodes" && mode === "add") {
       addNodeAt(point);
       return;
     }
@@ -1328,24 +1751,45 @@
   window.addEventListener("mousemove", function(evt){
     const point = screenToSvg(evt);
 
-    if (dragState) {
+    if (dragState){
+
       if (dragState.kind === "node") {
+
         const node = data.nodes.find(n => n.id === dragState.id);
+
         if (node) {
           moveNode(node, point);
           if (selectedNodeId === node.id) loadNodeProperties();
           render();
         }
-      } else if (dragState.kind === "subring") {
+
+      }
+      else if (dragState.kind === "subring") {
+
         const sub = getSubRing(dragState.id);
+
         if (sub) {
           moveSubring(sub, point);
           loadSubringProperties();
           render();
         }
+
       }
-      return;
+      else if (dragState.kind === "mainRing") {
+
+        const ring = getMainRing(dragState.id);
+
+        if (ring) {
+          moveMainRing(ring, point);
+          ringsDirty = true;
+          refreshComputedPositions();
+          render();
+        }
+
+      }
+
     }
+
 
     if (panState.dragging) {
       const dx = evt.clientX - panState.startX;
@@ -1387,9 +1831,68 @@
     applyTransform();
   }, { passive:false });
 
+  applyMainRingBtn.addEventListener("click", function(){
+    const ring = data.mainRings.find(r => r.id === selectedMainRing.value);
+    if (!ring) return;
+
+    ring.radius = Math.max(10, Number(mainRingRadiusEdit.value || ring.radius));
+
+    refreshComputedPositions();
+    populateSelectors();
+    saveHistory();
+    render();
+  });
+
+  els.addBonusBtn.addEventListener("click", function(){
+
+    const node = data.nodes.find(n => n.id === selectedNodeId);
+    if (!node) return;
+
+    const attr = els.bonusAttrSelect.value;
+
+    const value = Number(els.bonusValueInput.value);
+
+    if (isNaN(value)) return;
+
+    if (!node.bonuses) node.bonuses = {};
+
+    node.bonuses[attr] = value;
+
+    saveHistory();
+    renderNodeBonuses();
+
+  });
+
+
+  els.addAttrBtn.addEventListener("click", function(){
+
+    const id = els.newAttrId.value.trim();
+    const name = els.newAttrName.value.trim();
+
+    if (!id || !name) return;
+
+    if (data.attributes.some(a => a.id === id)){
+      alert("Attribute already exists");
+      return;
+    }
+
+    data.attributes.push({ id, name });
+
+    populateSelectors();
+    saveHistory();
+
+  });
+
+
+  els.deleteMainRingBtn.addEventListener("click", deleteSelectedMainRing);
+  els.modeDisconnectBtn.addEventListener("click", () => setMode("disconnect"));
+
   els.modeSelectBtn.addEventListener("click", () => setMode("select"));
   els.modeAddBtn.addEventListener("click", () => setMode("add"));
   els.modeConnectBtn.addEventListener("click", () => setMode("connect"));
+
+  els.modeNodesBtn.addEventListener("click", () => setEditMode("nodes"));
+  els.modeRingsBtn.addEventListener("click", () => setEditMode("rings"));
 
   els.undoBtn.addEventListener("click", undo);
   els.redoBtn.addEventListener("click", redo);
@@ -1401,14 +1904,30 @@
   });
 
   els.deleteNodeBtn.addEventListener("click", deleteSelectedNode);
-  els.deleteSubringBtn.addEventListener("click", deleteSelectedSubring);
   els.deleteLinkBtn.addEventListener("click", function(){
-    if (data.connections.length) {
-      data.connections.pop();
-      saveHistory();
-      render();
-    }
+    setMode("disconnect");
+
   });
+
+
+  els.addReqAttrBtn.addEventListener("click",function(){
+
+    const node=data.nodes.find(n=>n.id===selectedNodeId);
+    if(!node)return;
+
+    if(!node.requirements){
+      node.requirements={points:0,attributes:{}};
+    }
+
+    const attr=els.reqAttrSelect.value;
+    const val=Number(els.reqAttrValue.value || 0);
+
+    node.requirements.attributes[attr]=val;
+
+    renderRequirementAttributes(node);
+    saveHistory();
+  });
+
 
   els.addMainRingBtn.addEventListener("click", addMainRing);
   els.addSubringBtn.addEventListener("click", addSubring);
@@ -1417,12 +1936,6 @@
 
   els.applyPropsBtn.addEventListener("click", applyNodeProperties);
   els.resnapBtn.addEventListener("click", resnapSelectedNode);
-
-  els.activeStartSelect.addEventListener("change", function(){
-    data.activeStartId = els.activeStartSelect.value || "";
-    saveHistory();
-    render();
-  });
 
   els.selectedSubringSelect.addEventListener("change", function(){
     selectedSubringId = els.selectedSubringSelect.value || null;
@@ -1435,6 +1948,7 @@
   populateSelectors();
   refreshComputedPositions();
   setMode("select");
+  setEditMode("rings");
   saveHistory();
   render();
   exportJSON();

@@ -24,6 +24,21 @@
 
   *{ box-sizing:border-box; }
 
+  @keyframes startPulse{
+    0%{
+      filter:drop-shadow(0 0 0 rgba(120,255,170,0));
+      transform:scale(1);
+    }
+    50%{
+      filter:drop-shadow(0 0 12px rgba(120,255,170,0.6));
+      transform:scale(1.06);
+    }
+    100%{
+      filter:drop-shadow(0 0 0 rgba(120,255,170,0));
+      transform:scale(1);
+    }
+  }
+
   html,body{
     width:100%;
     height:100%;
@@ -114,6 +129,10 @@
 
   svg.dragging{ cursor:grabbing; }
 
+  .node.start.selectable{
+    cursor:pointer;
+  }
+
   .main-ring{
     fill:none;
     stroke:var(--ring);
@@ -175,10 +194,16 @@
     stroke:var(--start);
   }
 
-  .node.disabled{
-    opacity:0.22;
-    pointer-events:none;
+  .node.start.selectable .core{
+    animation:startPulse 2.2s ease-in-out infinite;
+    stroke:#8cffc2;
   }
+
+  .node.disabled .core{
+    filter: grayscale(0.7);
+    opacity:0.6;
+  }
+
 
   .tooltip{
     position:absolute;
@@ -233,9 +258,10 @@
       <button id="resetViewBtn">Reset View</button>
     </div>
     <div class="row">
-      <div>Allocated: <span id="allocatedCount">0</span></div>
+      <div>Skill Points: <span id="allocatedCount">0</span></div>
       <div>Active Start: <span id="activeStartLabel">None</span></div>
     </div>
+    <div id="statPanel"></div>
     <div class="mini">
       Paste editor JSON below, then click Load JSON.
     </div>
@@ -276,12 +302,18 @@
   const jsonBox = document.getElementById("jsonBox");
   const allocatedCountEl = document.getElementById("allocatedCount");
   const activeStartLabel = document.getElementById("activeStartLabel");
+  const statPanel = document.getElementById("statPanel");
+
 
   const CENTER = { x:800, y:500 };
 
   let data = null;
   let nodeMap = {};
   let adjacency = {};
+  let chosenStartId = null;
+  let playerStats = {};
+  let spentPoints = 0;
+  let playerPoints = 1000000;
 
   const view = { x:0, y:0, scale:1 };
   let dragging = false;
@@ -292,15 +324,105 @@
 
   function defaultData(){
     return {
+      attributes: [],
       mainRings: [{id:"mr1", radius:120}],
       subRings: [],
       nodes: [
-        {id:"n1", name:"Start", desc:"Origin", type:"start", size:18, orbitType:"main", mainRingId:"mr1", subRingId:"", angleDeg:-90, radiusOffset:0, x:800, y:380}
+        {
+          id:"n1",
+          name:"Start",
+          desc:"Origin",
+          type:"start",
+          size:18,
+          orbitType:"main",
+          mainRingId:"mr1",
+          subRingId:"",
+          angleDeg:-90,
+          radiusOffset:0,
+          x:800,
+          y:380,
+          bonuses:{}
+        }
       ],
-      connections: [],
-      activeStartId: "n1"
+      connections: []
     };
   }
+
+  function computeNodeDistances(){
+
+    const dist = {};
+    const queue = [];
+
+    for(const n of data.nodes){
+      if(n.allocated){
+        dist[n.id] = 0;
+        queue.push(n.id);
+      }
+    }
+
+    while(queue.length){
+      const cur = queue.shift();
+
+      for(const next of (adjacency[cur] || [])){
+        if(dist[next] === undefined){
+          dist[next] = dist[cur] + 1;
+          queue.push(next);
+        }
+      }
+    }
+
+    return dist;
+  }
+
+  function computeStats(){
+
+    const totals = {};
+
+    if (!data.attributes) return totals;
+
+    for (const attr of data.attributes){
+      totals[attr.id] = 0;
+    }
+
+    for (const node of data.nodes){
+
+      if (!node.allocated) continue;
+      if (!node.bonuses) continue;
+
+      for (const key in node.bonuses){
+
+        if (!(key in totals)){
+          totals[key] = 0;
+        }
+
+        totals[key] += Number(node.bonuses[key]);
+      }
+
+    }
+    playerStats = totals;
+    return totals;
+  }
+
+  function renderStats(){
+
+    if (!data.attributes) return;
+
+    const stats = computeStats();
+
+    statPanel.innerHTML = "";
+
+    for (const attr of data.attributes){
+
+      const value = stats[attr.id] || 0;
+
+      const row = document.createElement("div");
+      row.textContent = attr.name + ": " + value;
+
+      statPanel.appendChild(row);
+
+    }
+  }
+
 
   function createSvg(tag){
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -356,7 +478,11 @@
         node.y = p.y;
       }
       if (typeof node.allocated !== "boolean") {
-        node.allocated = node.id === data.activeStartId;
+        node.allocated = false;
+      }
+
+      if (!node.bonuses) {
+        node.bonuses = {};
       }
     }
   }
@@ -377,8 +503,13 @@
   function canAllocate(id){
     const node = nodeMap[id];
     if (!node) return false;
-    if (node.type === "start") return id === data.activeStartId;
+
+    if (!chosenStartId) {
+      return node.type === "start" && id === chosenStartId;
+    }
+
     if (node.allocated) return true;
+
     return adjacency[id].some(nid => nodeMap[nid] && nodeMap[nid].allocated);
   }
 
@@ -394,7 +525,7 @@
 
     const queue = [data.activeStartId];
     const seen = {};
-    if (data.activeStartId) seen[data.activeStartId] = true;
+    if (chosenStartId) seen[chosenStartId] = true;
 
     while (queue.length) {
       const cur = queue.shift();
@@ -416,15 +547,37 @@
     const node = nodeMap[id];
     if (!node) return;
 
-    if (node.type === "start") return;
+    if (node.type === "start") {
+      if (!chosenStartId) {
+        chosenStartId = id;
+
+        for (const n of data.nodes) n.allocated = false;
+        node.allocated = true;
+
+        renderState();
+      }
+      return;
+    }
 
     if (!node.allocated) {
+
       if (!canAllocate(id)) return;
+      if (!requirementsMet(node)) return;
+
+      const cost = node.requirements?.points || 0;
+
+      spentPoints += cost;
       node.allocated = true;
     } else {
+
+      const cost = node.requirements?.points || 0;
+
       if (refundBlocked(id)) return;
+
+      spentPoints -= cost;
       node.allocated = false;
     }
+
     renderState();
   }
 
@@ -450,32 +603,83 @@
   }
 
   function renderConnections(){
-    connectionsLayer.innerHTML = "";
-    for (const [aId, bId] of data.connections) {
+
+  connectionsLayer.innerHTML = "";
+
+  for (const [aId, bId] of data.connections){
+
       const a = nodeMap[aId];
       const b = nodeMap[bId];
+
       if (!a || !b) continue;
+
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx*dx + dy*dy);
+
+      const nx = dx / len;
+      const ny = dy / len;
+
+      const ar = Number(a.size || 14) + 5;
+      const br = Number(b.size || 14) + 5;
+
+      const x1 = a.x + nx * ar;
+      const y1 = a.y + ny * ar;
+
+      const x2 = b.x - nx * br;
+      const y2 = b.y - ny * br;
+
       const line = createSvg("line");
+
       line.setAttribute("class", "connection");
-      line.setAttribute("x1", a.x);
-      line.setAttribute("y1", a.y);
-      line.setAttribute("x2", b.x);
-      line.setAttribute("y2", b.y);
+
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+
       line.dataset.a = aId;
       line.dataset.b = bId;
+
       connectionsLayer.appendChild(line);
     }
   }
 
   function renderNodes(){
+
+    const distances = computeNodeDistances();   // <-- add this
+
     nodesLayer.innerHTML = "";
+
     for (const node of data.nodes) {
+
       const g = createSvg("g");
+
       let cls = "node";
+
+      if (!requirementsMet(node) && !node.allocated){
+        cls += " disabled";
+      }
+
       if (node.allocated) cls += " active";
-      if (node.type === "start") cls += " start";
-      if (node.type === "start" && data.activeStartId && node.id !== data.activeStartId) cls += " disabled";
+
+      if (node.type === "start") {
+        cls += " start";
+        if (!chosenStartId) cls += " selectable";
+      }
+
       g.setAttribute("class", cls);
+
+      // ----- OPACITY RULE -----
+      const d = distances[node.id];
+
+      if (d === undefined || d > 1){
+        g.style.opacity = 0.25;
+      }else{
+        g.style.opacity = 1;
+      }
+      // ------------------------
 
       const r = Number(node.size || 14);
 
@@ -498,6 +702,7 @@
       g.addEventListener("mouseenter", e => showTooltip(e, node));
       g.addEventListener("mousemove", moveTooltip);
       g.addEventListener("mouseleave", hideTooltip);
+
       g.addEventListener("click", function(evt){
         evt.stopPropagation();
         toggleNode(node.id);
@@ -505,21 +710,58 @@
     }
   }
 
+  function requirementsMet(node){
+
+    if(!node.requirements) return true;
+
+    const req=node.requirements;
+
+    if(req.points){
+      const remaining = playerPoints - spentPoints;
+      if(remaining < req.points) return false;
+    }
+
+    if(req.attributes){
+      for(const attr in req.attributes){
+
+        const need=req.attributes[attr];
+        const have=playerStats[attr] || 0;
+
+        if(have < need) return false;
+      }
+    }
+
+    return true;
+  }
+
   function renderState(){
+    const distances = computeNodeDistances();
+
     document.querySelectorAll(".connection").forEach(line => {
+
       const a = nodeMap[line.dataset.a];
       const b = nodeMap[line.dataset.b];
+
       line.classList.toggle("active", !!(a && b && a.allocated && b.allocated));
+
+      const da = distances[a.id];
+      const db = distances[b.id];
+
+      // fade if both nodes are further than 1 step
+      if((da === undefined || da > 1) && (db === undefined || db > 1)){
+        line.style.opacity = 0.2;
+      }else{
+        line.style.opacity = 1;
+      }
+
     });
 
-    let count = 0;
-    for (const node of data.nodes) {
-      if (node.allocated && node.type !== "start") count++;
-    }
-    allocatedCountEl.textContent = count;
-    const start = nodeMap[data.activeStartId];
-    activeStartLabel.textContent = start ? (start.name || start.id) : "None";
+    allocatedCountEl.textContent = playerPoints - spentPoints;
 
+    const start = nodeMap[chosenStartId];
+    activeStartLabel.textContent = start ? (start.name || start.id) : "";
+    
+    renderStats();
     renderNodes();
   }
 
@@ -535,14 +777,10 @@
     try {
       const parsed = JSON.parse(jsonBox.value);
       data = parsed;
-      if (!data.activeStartId) {
-        const start = data.nodes.find(n => n.type === "start");
-        data.activeStartId = start ? start.id : "";
-      }
-      for (const n of data.nodes) n.allocated = false;
-      if (data.activeStartId && nodeExists(data.activeStartId)) {
-        const startNode = data.nodes.find(n => n.id === data.activeStartId);
-        if (startNode) startNode.allocated = true;
+      chosenStartId = null;
+
+      for (const n of data.nodes) {
+        n.allocated = false;
       }
       renderAll();
     } catch(e) {
@@ -555,8 +793,10 @@
   }
 
   function refundAll(){
+    chosenStartId = null;
+
     for (const n of data.nodes) {
-      n.allocated = n.id === data.activeStartId;
+      n.allocated = false;
     }
     renderState();
   }
@@ -568,7 +808,33 @@
   function showTooltip(event, node){
     tooltip.querySelector(".name").textContent = node.name || node.id;
     tooltip.querySelector(".type").textContent = node.type || "node";
-    tooltip.querySelector(".desc").textContent = node.desc || "";
+    let desc = node.desc || "";
+
+    for (const k in node.bonuses){
+
+      const v = Number(node.bonuses[k]);
+
+      desc += "\n" + (v >= 0 ? "+" + v : v) + " " + k.toUpperCase();
+
+    }
+
+
+    if (node.requirements){
+
+      if (node.requirements.points){
+        desc += "\nRequires " + node.requirements.points + " skill points";
+      }
+
+      if (node.requirements.attributes){
+        for (const k in node.requirements.attributes){
+          desc += "\nRequires " + node.requirements.attributes[k] + " " + k.toUpperCase();
+        }
+      }
+
+    }
+
+
+    tooltip.querySelector(".desc").textContent = desc;
     tooltip.classList.add("visible");
     moveTooltip(event);
   }
