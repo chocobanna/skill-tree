@@ -417,6 +417,25 @@
     };
   }
 
+  function nodeRadius(type){
+
+    switch(type){
+
+      case "start":
+        return 20;
+
+      case "keystone":
+        return 26;
+
+      case "notable":
+        return 18;
+
+      default:
+        return 14;
+    }
+
+  }
+
   function computeNodeDistances(){
 
     const dist = {};
@@ -781,7 +800,7 @@
       }
       // ------------------------
 
-      const r = Number(node.size || 14);
+      const r = nodeRadius(node.type);
 
       const outer = createSvg("circle");
       outer.setAttribute("class", "outer");

@@ -401,14 +401,6 @@
       </div>
     </div>
 
-    <div class="row">
-      <div>
-        <label>Node size</label>
-        <input id="addNodeSize" type="number" value="14" min="4" max="80">
-      </div>
-      <div></div>
-    </div>
-
     <hr>
 
     </div>
@@ -490,10 +482,6 @@
           <option value="keystone">keystone</option>
           <option value="start">start</option>
         </select>
-      </div>
-      <div>
-        <label>Size</label>
-        <input id="propSize" type="number" value="14" min="4" max="80">
       </div>
     </div>
 
@@ -887,10 +875,9 @@
     return Math.round(d / step) * step;
   }
 
-  function nodeRadius(type, size){
-    if (typeof size === "number" && !isNaN(size)) return size;
-    if (type === "start") return 18;
-    if (type === "keystone") return 24;
+  function nodeRadius(type){
+    if (type === "start") return 20;
+    if (type === "keystone") return 26;
     if (type === "notable") return 18;
     return 14;
   }
@@ -1119,7 +1106,6 @@
     els.propName.value = node.name || "";
     els.propDesc.value = node.desc || "";
     els.propType.value = node.type || "normal";
-    els.propSize.value = node.size ?? nodeRadius(node.type);
     els.propOrbitType.value = node.orbitType || "main";
     els.propAngle.value = Number(node.angleDeg || 0);
     els.propMainRing.value = node.mainRingId || "";
@@ -1172,7 +1158,6 @@
     node.name = els.propName.value;
     node.desc = els.propDesc.value;
     node.type = els.propType.value;
-    node.size = Math.max(4, Number(els.propSize.value || 14));
     node.orbitType = els.propOrbitType.value;
     node.mainRingId = els.propMainRing.value;
     node.subRingId = els.propSubRing.value;
@@ -1290,7 +1275,6 @@
       name: "node",
       desc: "",
       type: els.addNodeType.value,
-      size: Math.max(4, Number(els.addNodeSize.value || 14)),
       orbitType,
       mainRingId: els.addOrbitType.value === "main"
         ? getClosestMainRing(point)?.id || ""
@@ -1682,7 +1666,7 @@
       if (node.type === "start") cls += " start";
       g.setAttribute("class", cls);
 
-      const r = nodeRadius(node.type, node.size);
+      const r = nodeRadius(node.type);
 
       const outer = createSvg("circle");
       outer.setAttribute("class", "outer");
