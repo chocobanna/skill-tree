@@ -672,9 +672,7 @@
       g.setAttribute("class", cls);
 
       // ----- OPACITY RULE -----
-      const d = distances[node.id];
-
-      if (d === undefined || d > 1){
+      if (nodeIsDim(node, distances)){
         g.style.opacity = 0.25;
       }else{
         g.style.opacity = 1;
@@ -708,6 +706,16 @@
         toggleNode(node.id);
       });
     }
+  }
+
+  function nodeIsDim(node, distances){
+
+    const d = distances[node.id];
+
+    const tooFar = (d === undefined || d > 1);
+    const reqFail = !requirementsMet(node) && !node.allocated;
+
+    return tooFar || reqFail;
   }
 
   function requirementsMet(node){
@@ -748,12 +756,14 @@
       const db = distances[b.id];
 
       // fade if both nodes are further than 1 step
-      if((da === undefined || da > 1) && (db === undefined || db > 1)){
+      const dimA = nodeIsDim(a, distances);
+      const dimB = nodeIsDim(b, distances);
+
+      if (dimA || dimB){
         line.style.opacity = 0.2;
       }else{
         line.style.opacity = 1;
       }
-
     });
 
     allocatedCountEl.textContent = playerPoints - spentPoints;
