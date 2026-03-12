@@ -1,0 +1,168 @@
+{
+  "attributes": [
+    {
+      "id": "str",
+      "name": "Strength"
+    },
+    {
+      "id": "dex",
+      "name": "Dexterity"
+    },
+    {
+      "id": "int",
+      "name": "Intelligence"
+    },
+    {
+      "id": "hp",
+      "name": "Health"
+    }
+  ],
+  "mainRings": [
+    {
+      "id": "mr1",
+      "radius": 120
+    },
+    {
+      "id": "mr2",
+      "radius": 240
+    },
+    {
+      "id": "mr3",
+      "radius": 360
+    },
+    {
+      "id": "mr4",
+      "radius": 480
+    }
+  ],
+  "subRings": [
+    {
+      "id": "sr1",
+      "parentMainRingId": "mr2",
+      "anchorAngleDeg": -30,
+      "radius": 75
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Path of the Warrior",
+      "desc": "The path of combat.",
+      "type": "start",
+      "size": 18,
+      "orbitType": "main",
+      "mainRingId": "mr1",
+      "subRingId": "",
+      "angleDeg": 270,
+      "radiusOffset": 0,
+      "x": 800,
+      "y": 380,
+      "bonuses": {
+        "hp": 5,
+        "str": 8
+      },
+      "requirements": {
+        "points": 0,
+        "attributes": {}
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Path of the Mage",
+      "desc": "The path of intrigue and question.",
+      "type": "start",
+      "size": 18,
+      "orbitType": "main",
+      "mainRingId": "mr1",
+      "subRingId": "",
+      "angleDeg": 360,
+      "radiusOffset": 0,
+      "x": 920,
+      "y": 499.99999999999994,
+      "bonuses": {
+        "int": 15,
+        "hp": 2
+      },
+      "requirements": {
+        "points": 0,
+        "attributes": {}
+      }
+    },
+    {
+      "id": "n101",
+      "name": "Path of the Rouge",
+      "desc": "The path of the shadows",
+      "type": "start",
+      "size": 18,
+      "orbitType": "main",
+      "mainRingId": "mr1",
+      "subRingId": "",
+      "angleDeg": 180,
+      "radiusOffset": 0,
+      "x": 680,
+      "y": 500,
+      "bonuses": {
+        "dex": 8,
+        "hp": 4,
+        "str": 2
+      },
+      "requirements": {
+        "points": 0,
+        "attributes": {}
+      }
+    },
+    {
+      "id": "n102",
+      "name": "Path of the Craftsman",
+      "desc": "The path of creation, and beauty.",
+      "type": "start",
+      "size": 18,
+      "orbitType": "main",
+      "mainRingId": "mr1",
+      "subRingId": "",
+      "angleDeg": 90,
+      "radiusOffset": 0,
+      "x": 800,
+      "y": 620,
+      "bonuses": {
+        "int": 10,
+        "dex": 8,
+        "hp": 1,
+        "str": 1
+      },
+      "requirements": {
+        "points": 0,
+        "attributes": {}
+      }
+    },
+    {
+      "id": "n103",
+      "name": "Warrior Form : Adept",
+      "desc": "Proper form for combat.",
+      "type": "keystone",
+      "size": 14,
+      "orbitType": "main",
+      "mainRingId": "mr2",
+      "subRingId": "",
+      "angleDeg": 270,
+      "radiusOffset": 0,
+      "x": 800,
+      "y": 260,
+      "bonuses": {
+        "str": 5,
+        "dex": 5,
+        "hp": 5
+      },
+      "requirements": {
+        "points": 0,
+        "attributes": {}
+      }
+    }
+  ],
+  "connections": [
+    [
+      "n1",
+      "n103"
+    ]
+  ]
+}
