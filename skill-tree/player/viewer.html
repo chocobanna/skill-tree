@@ -773,16 +773,44 @@
     renderState();
   }
 
+  function decodeRingIds(){
+
+    if (!data || !data.nodes) return;
+
+    for (const node of data.nodes){
+
+      if (!node.ringId) continue;
+
+      const parts = node.ringId.split(":");
+
+      const type = parts[0] || "free";
+      const main = parts[1] || "";
+      const sub  = parts[2] || "";
+
+      node.orbitType = type;
+
+      node.mainRingId = (main === "none") ? "" : main;
+      node.subRingId  = (sub === "none") ? "" : sub;
+
+    }
+  }
+
   function loadJSON(){
     try {
+
       const parsed = JSON.parse(jsonBox.value);
       data = parsed;
+
+      decodeRingIds();   // <-- NEW
+
       chosenStartId = null;
 
       for (const n of data.nodes) {
         n.allocated = false;
       }
+
       renderAll();
+
     } catch(e) {
       alert("Invalid JSON");
     }

@@ -1481,8 +1481,25 @@
   }
 
   function exportJSON(){
+
     refreshComputedPositions();
-    jsonBox.value = JSON.stringify(data, null, 2);
+
+    const out = deepClone(data);
+
+    for (const node of out.nodes){
+
+      const main = node.mainRingId || "none";
+      const sub  = node.subRingId || "none";
+      const type = node.orbitType || "free";
+
+      node.ringId = `${type}:${main}:${sub}`;
+
+      delete node.mainRingId;
+      delete node.subRingId;
+      delete node.orbitType;
+    }
+
+    jsonBox.value = JSON.stringify(out, null, 2);
   }
 
   function importJSON(){
