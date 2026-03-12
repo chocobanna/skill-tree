@@ -875,6 +875,24 @@
     return Math.round(d / step) * step;
   }
 
+  function hexPoints(x, y, r){
+
+    const pts = [];
+
+    for (let i = 0; i < 6; i++){
+
+      const a = Math.PI / 3 * i;
+
+      pts.push(
+        (x + Math.cos(a) * r) + "," +
+        (y + Math.sin(a) * r)
+      );
+
+    }
+
+    return pts.join(" ");
+  }
+
   function nodeRadius(type){
     if (type === "start") return 20;
     if (type === "keystone") return 26;
@@ -1534,6 +1552,23 @@
         throw new Error("Missing required fields.");
       }
       data = parsed;
+
+      // restore orbit fields from ringId
+      for (const node of data.nodes){
+
+        if (node.ringId){
+
+          const parts = node.ringId.split(":");
+
+          node.orbitType = parts[0] || "free";
+          node.mainRingId = parts[1] !== "none" ? parts[1] : "";
+          node.subRingId  = parts[2] !== "none" ? parts[2] : "";
+
+          delete node.ringId;
+        }
+
+      }
+
       ensureUniqueNodeIds();
       selectedNodeId = null;
       selectedSubringId = null;
@@ -1668,17 +1703,41 @@
 
       const r = nodeRadius(node.type);
 
-      const outer = createSvg("circle");
-      outer.setAttribute("class", "outer");
-      outer.setAttribute("cx", node.x);
-      outer.setAttribute("cy", node.y);
-      outer.setAttribute("r", r + 5);
+      let outer;
 
-      const core = createSvg("circle");
-      core.setAttribute("class", "core");
-      core.setAttribute("cx", node.x);
-      core.setAttribute("cy", node.y);
-      core.setAttribute("r", r);
+      if (node.type === "keystone"){
+
+        outer = createSvg("polygon");
+        outer.setAttribute("class", "outer");
+        outer.setAttribute("points", hexPoints(node.x, node.y, r + 5));
+
+      }else{
+
+        outer = createSvg("circle");
+        outer.setAttribute("class", "outer");
+        outer.setAttribute("cx", node.x);
+        outer.setAttribute("cy", node.y);
+        outer.setAttribute("r", r + 5);
+
+      }
+
+      let core;
+
+      if (node.type === "keystone"){
+
+        core = createSvg("polygon");
+        core.setAttribute("class", "core");
+        core.setAttribute("points", hexPoints(node.x, node.y, r));
+
+      }else{
+
+        core = createSvg("circle");
+        core.setAttribute("class", "core");
+        core.setAttribute("cx", node.x);
+        core.setAttribute("cy", node.y);
+        core.setAttribute("r", r);
+
+      }
 
       const label = createSvg("text");
       label.setAttribute("class", "node-label");
