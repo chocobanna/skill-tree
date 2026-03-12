@@ -832,9 +832,23 @@
     render();
   }
 
-
   function deepClone(obj){
     return JSON.parse(JSON.stringify(obj));
+  }
+
+  function generateNodeId(){
+
+    let max = 0;
+
+    for (const n of data.nodes){
+      const m = /^n(\d+)$/.exec(n.id);
+      if (m){
+        const v = Number(m[1]);
+        if (v > max) max = v;
+      }
+    }
+
+    return "n" + (max + 1);
   }
 
   function saveHistory(){
@@ -1272,7 +1286,7 @@
   function addNodeAt(point){
     const orbitType = els.addOrbitType.value;
     const node = {
-      id: "n" + (++idCounter),
+      id: generateNodeId(),
       name: "node",
       desc: "",
       type: els.addNodeType.value,
@@ -1388,6 +1402,33 @@
       node.radiusOffset = p.radiusOffset;
       node.x = p.x;
       node.y = p.y;
+    }
+  }
+
+  function ensureUniqueNodeIds(){
+
+    const seen = new Set();
+
+    for (const node of data.nodes){
+
+      let id = node.id;
+
+      while (seen.has(id)){
+        id = generateNodeId();
+      }
+
+      if (id !== node.id){
+
+        const old = node.id;
+        node.id = id;
+
+        for (const c of data.connections){
+          if (c[0] === old) c[0] = id;
+          if (c[1] === old) c[1] = id;
+        }
+      }
+
+      seen.add(id);
     }
   }
 
@@ -1509,6 +1550,7 @@
         throw new Error("Missing required fields.");
       }
       data = parsed;
+      ensureUniqueNodeIds();
       selectedNodeId = null;
       selectedSubringId = null;
       populateSelectors();

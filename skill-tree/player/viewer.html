@@ -67,6 +67,50 @@
     padding:10px 12px;
   }
 
+  #rightPanel{
+    top:10px;
+    right:10px;
+    width:260px;
+  }
+
+  #statPanel{
+    margin-top:8px;
+  }
+
+  .stat-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:4px 0;
+    border-bottom:1px solid rgba(255,215,140,0.08);
+    font-size:13px;
+  }
+
+  .stat-name{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:#d9cfae;
+  }
+
+  .stat-value{
+    font-weight:bold;
+    color:#ffe8b0;
+  }
+
+  /* attribute colors */
+  .stat-str .stat-value{ color:#ff7a7a; }
+  .stat-dex .stat-value{ color:#7aff9e; }
+  .stat-int .stat-value{ color:#7ac7ff; }
+  .stat-hp  .stat-value{ color:#ffd26a; }
+
+  /* small icons */
+  .stat-icon{
+    width:14px;
+    text-align:center;
+    opacity:0.85;
+  }
+
   #toolbar{
     top:10px;
     left:10px;
@@ -222,6 +266,29 @@
     z-index:20;
   }
 
+  .tooltip .bonuses{
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px solid rgba(255,205,120,0.18);
+    font-size:13px;
+  }
+
+  .tooltip .requirements{
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px solid rgba(255,100,100,0.25);
+    color:#ffb8b8;
+    font-size:12px;
+  }
+
+  .tooltip .bonus-line{
+    color:#9fe8a4;
+  }
+
+  .tooltip .req-line{
+    color:#ff9d9d;
+  }
+
   .tooltip.visible{ opacity:1; }
   .tooltip .name{ font-weight:bold; margin-bottom:6px; color:#ffe8b0; }
   .tooltip .type{ font-size:12px; color:#c8b791; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
@@ -261,7 +328,6 @@
       <div>Skill Points: <span id="allocatedCount">0</span></div>
       <div>Active Start: <span id="activeStartLabel">None</span></div>
     </div>
-    <div id="statPanel"></div>
     <div class="mini">
       Paste editor JSON below, then click Load JSON.
     </div>
@@ -271,15 +337,18 @@
     <textarea id="jsonBox" spellcheck="false"></textarea>
   </div>
 
-  <div class="title">
-    <h1>SKILL TREE VIEWER</h1>
-    <p>Scroll to zoom · drag to pan · click nodes to allocate</p>
+  <div id="rightPanel" class="panel">
+    <h3>PLAYER STATS</h3>
+    <div id="statPanel"></div>
   </div>
 
   <div id="tooltip" class="tooltip">
     <div class="name"></div>
     <div class="type"></div>
     <div class="desc"></div>
+
+    <div class="bonuses"></div>
+    <div class="requirements"></div>
   </div>
 
   <svg id="tree" viewBox="0 0 1600 1000">
@@ -415,14 +484,47 @@
 
       const value = stats[attr.id] || 0;
 
+      const alwaysVisible = ["str","dex","int","hp"];
+
+      if (value < 1 && !alwaysVisible.includes(attr.id)){
+        continue;
+      }
+
       const row = document.createElement("div");
-      row.textContent = attr.name + ": " + value;
+      row.className = "stat-row stat-" + attr.id;
+
+      const name = document.createElement("div");
+      name.className = "stat-name";
+
+      const icon = document.createElement("span");
+      icon.className = "stat-icon";
+
+      // simple icons
+      const icons = {
+        str:"*",
+        dex:"*",
+        int:"*",
+        hp:"❤"
+      };
+
+      icon.textContent = icons[attr.id] || "◆";
+
+      const label = document.createElement("span");
+      label.textContent = attr.name;
+
+      name.appendChild(icon);
+      name.appendChild(label);
+
+      const val = document.createElement("div");
+      val.className = "stat-value";
+      val.textContent = value;
+
+      row.appendChild(name);
+      row.appendChild(val);
 
       statPanel.appendChild(row);
-
     }
   }
-
 
   function createSvg(tag){
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -743,6 +845,9 @@
   }
 
   function renderState(){
+
+    computeStats();   // important: refresh requirements first
+
     const distances = computeNodeDistances();
 
     document.querySelectorAll(".connection").forEach(line => {
@@ -752,10 +857,6 @@
 
       line.classList.toggle("active", !!(a && b && a.allocated && b.allocated));
 
-      const da = distances[a.id];
-      const db = distances[b.id];
-
-      // fade if both nodes are further than 1 step
       const dimA = nodeIsDim(a, distances);
       const dimB = nodeIsDim(b, distances);
 
@@ -764,6 +865,7 @@
       }else{
         line.style.opacity = 1;
       }
+
     });
 
     allocatedCountEl.textContent = playerPoints - spentPoints;
@@ -844,35 +946,89 @@
   }
 
   function showTooltip(event, node){
+
     tooltip.querySelector(".name").textContent = node.name || node.id;
     tooltip.querySelector(".type").textContent = node.type || "node";
-    let desc = node.desc || "";
 
-    for (const k in node.bonuses){
+    const descBox = tooltip.querySelector(".desc");
+    const bonusesBox = tooltip.querySelector(".bonuses");
+    const reqBox = tooltip.querySelector(".requirements");
 
-      const v = Number(node.bonuses[k]);
+    descBox.textContent = node.desc || "";
+    bonusesBox.innerHTML = "";
+    reqBox.innerHTML = "";
 
-      desc += "\n" + (v >= 0 ? "+" + v : v) + " " + k.toUpperCase();
+    // ---- BONUSES ----
+    if (node.bonuses){
 
+      for (const k in node.bonuses){
+
+        const v = Number(node.bonuses[k]);
+
+        const row = document.createElement("div");
+        row.className = "bonus-line";
+
+        row.textContent = (v >= 0 ? "+" + v : v) + " " + k.toUpperCase();
+
+        bonusesBox.appendChild(row);
+      }
     }
 
-
+    // ---- REQUIREMENTS ----
     if (node.requirements){
 
+      const stats = playerStats || {};
+
+      // skill point requirement
       if (node.requirements.points){
-        desc += "\nRequires " + node.requirements.points + " skill points";
+
+        const need = node.requirements.points;
+        const have = playerPoints - spentPoints;
+
+        const row = document.createElement("div");
+        row.className = "req-line";
+
+        const met = have >= need;
+
+        row.textContent =
+          (met ? "✓ " : "✗ ") +
+          "Requires " + need + " skill points";
+
+        if (!met){
+          row.style.color = "#ff5c5c";
+          row.style.fontWeight = "bold";
+        }
+
+        reqBox.appendChild(row);
       }
 
+      // attribute requirements
       if (node.requirements.attributes){
-        for (const k in node.requirements.attributes){
-          desc += "\nRequires " + node.requirements.attributes[k] + " " + k.toUpperCase();
+
+        for (const attr in node.requirements.attributes){
+
+          const need = node.requirements.attributes[attr];
+          const have = stats[attr] || 0;
+
+          const row = document.createElement("div");
+          row.className = "req-line";
+
+          const met = have >= need;
+
+          row.textContent =
+            (met ? "✓ " : "✗ ") +
+            "Requires " + need + " " + attr.toUpperCase();
+
+          if (!met){
+            row.style.color = "#ff5c5c";
+            row.style.fontWeight = "bold";
+          }
+
+          reqBox.appendChild(row);
         }
       }
-
     }
 
-
-    tooltip.querySelector(".desc").textContent = desc;
     tooltip.classList.add("visible");
     moveTooltip(event);
   }
