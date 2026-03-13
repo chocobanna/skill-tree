@@ -213,6 +213,16 @@
     stroke-width:2;
   }
 
+  .node.path .core{
+    stroke:var(--node-stroke);
+  }
+
+  .node.path.highlight .core{
+    stroke:#ff6b6b;
+    stroke-width:3;
+    filter:drop-shadow(0 0 10px rgba(255,80,80,0.5));
+  }
+
   .node .core{
     fill:var(--node-fill);
     stroke:var(--node-stroke);
@@ -434,6 +444,26 @@
         return 14;
     }
 
+  }
+
+  function isPathNode(node){
+    return !!node.exclusiveGroup;
+  }
+
+  function isChoiceNode(node){
+
+    const neighbors = adjacency[node.id] || [];
+
+    const groups = new Set();
+
+    for(const nid of neighbors){
+      const n = nodeMap[nid];
+      if(n?.exclusiveGroup){
+        groups.add(n.exclusiveGroup);
+      }
+    }
+
+    return groups.size > 0;
   }
 
   function computeNodeDistances(){
@@ -781,9 +811,15 @@
       const g = createSvg("g");
 
       let cls = "node";
-
+      
+      g.__nodeId = node.id;
+      
       if (!requirementsMet(node) && !node.allocated){
         cls += " disabled";
+      }
+
+      if(isPathNode(node)){
+        cls += " path";
       }
 
       if (node.allocated) cls += " active";
@@ -821,15 +857,41 @@
       g.appendChild(core);
       nodesLayer.appendChild(g);
 
-      g.addEventListener("mouseenter", e => showTooltip(e, node));
+      g.addEventListener("mouseenter", e=>{
+        showTooltip(e,node);
+        highlightExclusiveGroup(node.exclusiveGroup);
+      });
       g.addEventListener("mousemove", moveTooltip);
-      g.addEventListener("mouseleave", hideTooltip);
+      g.addEventListener("mouseleave", ()=>{
+        hideTooltip();
+        clearExclusiveHighlight();
+      });
 
       g.addEventListener("click", function(evt){
         evt.stopPropagation();
         toggleNode(node.id);
       });
     }
+  }
+
+  function highlightExclusiveGroup(group){
+
+    if(!group) return;
+
+    document.querySelectorAll(".node").forEach(el=>{
+      const id = el.__nodeId;
+      const n = nodeMap[id];
+
+      if(n?.exclusiveGroup === group){
+        el.classList.add("highlight");
+      }
+    });
+  }
+
+  function clearExclusiveHighlight(){
+    document.querySelectorAll(".node.highlight").forEach(el=>{
+      el.classList.remove("highlight");
+    });
   }
 
   function exclusiveBlocked(node){
