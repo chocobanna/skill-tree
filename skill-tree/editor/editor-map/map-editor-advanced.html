@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Map Editor Advanced</title>
+<style>
+  :root{
+    --bg1:#090b11;
+    --bg2:#111624;
+    --panel:rgba(10,14,20,0.94);
+    --panel-border:rgba(255,215,140,0.12);
+    --text:#e8dcc0;
+    --muted:#a89b82;
+    --line:rgba(150,140,120,0.26);
+    --line-selected:#fff0c6;
+    --trade:#e6b85c;
+    --trade-selected:#fff0c6;
+    --node-fill:#1c2433;
+    --node-stroke:#8b7550;
+    --node-selected:#fff0c6;
+    --city:#7aa8ff;
+    --wild:#9a8f78;
+    --dungeon:#ff7a7a;
+    --player:#5eff9a;
+    --grid:rgba(255,215,140,0.05);
+    --ok:#9fe8a4;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{
+    width:100%; height:100%; margin:0; overflow:hidden;
+    color:var(--text); font-family:Arial, Helvetica, sans-serif;
+    background:
+      radial-gradient(circle at center, rgba(255,190,80,0.05) 0%, transparent 18%),
+      radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
+  }
+  #app{ width:100%; height:100%; position:relative; }
+  .panel{
+    position:absolute; z-index:10; background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:12px; padding:12px; box-shadow:0 8px 30px rgba(0,0,0,0.35); backdrop-filter:blur(6px);
+  }
+  #toolbar{ top:10px; left:10px; width:450px; max-height:calc(100vh - 20px); overflow:auto; }
+  #properties{ top:10px; right:10px; width:390px; max-height:calc(100vh - 20px); overflow:auto; }
+  #ioPanel{ left:10px; bottom:10px; width:560px; height:240px; }
+  #statusBox{ position:absolute; right:410px; top:10px; z-index:10; max-width:360px; padding:10px 12px; border-radius:12px;
+    background:rgba(10,14,20,0.8); border:1px solid rgba(255,215,140,0.10); color:var(--muted); font-size:12px; }
+  h3{ margin:0 0 10px 0; font-size:14px; letter-spacing:0.08em; }
+  .row{ display:flex; gap:8px; margin-bottom:8px; align-items:end; }
+  .row > *{ flex:1; }
+  .stack{ display:flex; flex-direction:column; gap:8px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ padding:4px 8px; border-radius:999px; border:1px solid rgba(255,215,140,0.16); color:var(--text); background:#111722; font-size:11px; }
+  label{ display:block; margin:0 0 4px 0; font-size:12px; color:var(--muted); }
+  input, select, textarea, button{
+    width:100%; background:linear-gradient(180deg, #1b2331, #101620); color:var(--text);
+    border:1px solid rgba(255,215,140,0.16); border-radius:8px; padding:8px 10px; outline:none;
+  }
+  textarea{ min-height:84px; resize:vertical; }
+  button{ cursor:pointer; font-weight:bold; }
+  button:hover{ filter:brightness(1.08); }
+  .activeMode{ outline:2px solid rgba(255,240,198,0.7); }
+  .mini{ color:var(--muted); font-size:12px; line-height:1.35; }
+  .good{ color:var(--ok); }
+  hr{ border:none; border-top:1px solid rgba(255,215,140,0.08); margin:10px 0; }
+  .listbox{ border:1px solid rgba(255,215,140,0.10); border-radius:8px; padding:8px; background:#0d121b; min-height:56px; }
+  .list-item{ display:flex; gap:8px; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,215,140,0.06); }
+  .list-item:last-child{ border-bottom:none; }
+  .list-item .left{ flex:1; min-width:0; }
+  .list-item .left strong{ display:block; font-size:12px; }
+  .list-item .left span{ display:block; color:var(--muted); font-size:11px; }
+  .smallbtn{ width:auto; padding:6px 8px; flex:0 0 auto; }
+  #canvas{ width:100%; height:100%; display:block; cursor:grab; user-select:none; }
+  #canvas.dragging{ cursor:grabbing; }
+  .grid-line{ stroke:var(--grid); stroke-width:1; }
+  .map-path{ stroke:var(--line); stroke-width:4; stroke-linecap:round; }
+  .map-path.selected{ stroke:var(--line-selected); stroke-width:5; }
+  .trade-path{ stroke:var(--trade); stroke-width:3; stroke-linecap:round; stroke-dasharray:10 8; opacity:0.95; }
+  .trade-path.selected{ stroke:var(--trade-selected); stroke-width:4; }
+  .location{ cursor:pointer; }
+  .location .outer{ fill:rgba(10,12,18,0.95); stroke:rgba(255,213,129,0.18); stroke-width:2; }
+  .location .core{ fill:var(--node-fill); stroke:var(--node-stroke); stroke-width:2; }
+  .location.city .core{ stroke:var(--city); }
+  .location.wild .core{ stroke:var(--wild); }
+  .location.dungeon .core{ stroke:var(--dungeon); }
+  .location.player .core{ stroke:var(--player); }
+  .location.selected .core{ stroke:var(--node-selected); stroke-width:3; filter:drop-shadow(0 0 10px rgba(255,240,198,0.4)); }
+  .location-label{ fill:#d9ceb6; font-size:12px; text-anchor:middle; pointer-events:none; }
+  .subtext{ fill:#998d74; font-size:10px; text-anchor:middle; pointer-events:none; }
+  #jsonBox{ width:100%; height:100%; background:#0b0f16; color:var(--text); border:1px solid rgba(255,215,140,0.12); border-radius:8px; resize:none; outline:none; padding:8px; font-family:Consolas, monospace; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar" class="panel">
+    <h3>WORLD MAP EDITOR+</h3>
+
+    <div class="row">
+      <button id="modeSelectBtn">Select</button>
+      <button id="modeAddBtn">Add Node</button>
+      <button id="modeConnectBtn">Connect</button>
+      <button id="modeTradeBtn">Trade Route</button>
+      <button id="modeDeleteLinkBtn">Delete Link</button>
+    </div>
+
+    <div class="row">
+      <button id="fitViewBtn">Fit View</button>
+      <button id="resetViewBtn">Reset View</button>
+      <button id="deleteNodeBtn">Delete Node</button>
+      <button id="deleteTradeBtn">Delete Trade</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>New node type</label>
+        <select id="newType">
+          <option value="city">city</option>
+          <option value="wild" selected>wild</option>
+          <option value="dungeon">dungeon</option>
+          <option value="player">player</option>
+        </select>
+      </div>
+      <div>
+        <label>Node size</label>
+        <input id="newSize" type="number" min="10" max="60" value="18">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label><input id="showGrid" type="checkbox" checked style="width:auto; margin-right:6px;">Show grid</label>
+      </div>
+      <div>
+        <label><input id="snapToGrid" type="checkbox" style="width:auto; margin-right:6px;">Snap to grid</label>
+      </div>
+      <div>
+        <label>Grid size</label>
+        <input id="gridSize" type="number" min="20" max="400" value="100">
+      </div>
+    </div>
+
+    <hr>
+    <h3>DEFINITIONS</h3>
+
+    <div class="row">
+      <input id="newResourceId" placeholder="resource id (iron)">
+      <input id="newResourceName" placeholder="Resource name">
+      <button id="addResourceBtn">Add</button>
+    </div>
+    <div id="resourceDefs" class="listbox mini"></div>
+
+    <div class="row">
+      <input id="newGoodId" placeholder="good id (tools)">
+      <input id="newGoodName" placeholder="Good name">
+      <button id="addGoodBtn">Add</button>
+    </div>
+    <div id="goodDefs" class="listbox mini"></div>
+
+    <div class="row">
+      <input id="newGuildId" placeholder="guild id (miners)">
+      <input id="newGuildName" placeholder="Guild name">
+      <button id="addGuildBtn">Add</button>
+    </div>
+    <div id="guildDefs" class="listbox mini"></div>
+
+    <hr>
+    <div class="row">
+      <button id="exportBtn">Export JSON</button>
+      <button id="importBtn">Import JSON</button>
+      <button id="newMapBtn">New Map</button>
+    </div>
+
+    <div class="mini">
+      Select: choose nodes or trade routes. Add Node: click empty space. Connect/Delete Link: click node A then node B. Trade Route: click node A then node B to create a route for the selected good.
+      Drag empty space to pan. Mouse wheel zooms at the cursor.
+    </div>
+  </div>
+
+  <div id="properties" class="panel">
+    <div id="locationSection">
+      <h3>LOCATION PROPERTIES</h3>
+
+      <label>ID</label>
+      <input id="propId" type="text" readonly>
+
+      <label>Name</label>
+      <input id="propName" type="text" placeholder="Location name">
+
+      <label>Description</label>
+      <textarea id="propDesc" placeholder="Description"></textarea>
+
+      <div class="row">
+        <div>
+          <label>Type</label>
+          <select id="propType">
+            <option value="city">city</option>
+            <option value="wild">wild</option>
+            <option value="dungeon">dungeon</option>
+            <option value="player">player</option>
+          </select>
+        </div>
+        <div>
+          <label>Size</label>
+          <input id="propSize" type="number" min="10" max="60" value="18">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>X</label>
+          <input id="propX" type="number">
+        </div>
+        <div>
+          <label>Y</label>
+          <input id="propY" type="number">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Travel speed</label>
+          <input id="propSpeed" type="number" min="0" step="1" value="100">
+        </div>
+        <div>
+          <label>Region</label>
+          <input id="propRegion" type="text" placeholder="Optional">
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="applyPropsBtn">Apply</button>
+        <button id="duplicateNodeBtn">Duplicate</button>
+      </div>
+
+      <hr>
+      <h3>RESOURCES AT LOCATION</h3>
+      <div id="locationResources" class="listbox mini"></div>
+      <div class="row">
+        <select id="resourceSelect"></select>
+        <input id="resourceAmount" type="number" value="10">
+        <button id="addResourceToLocationBtn">Add</button>
+      </div>
+
+      <hr>
+      <h3>MANUFACTURED GOODS</h3>
+      <div id="locationGoods" class="listbox mini"></div>
+      <div class="row">
+        <select id="goodSelect"></select>
+        <input id="goodAmount" type="number" value="10">
+        <button id="addGoodToLocationBtn">Add</button>
+      </div>
+
+      <hr>
+      <h3>GUILDS AT LOCATION</h3>
+      <div id="locationGuilds" class="listbox mini"></div>
+      <div class="row">
+        <select id="guildSelect"></select>
+        <button id="addGuildToLocationBtn">Add</button>
+      </div>
+    </div>
+
+    <div id="tradeSection">
+      <h3>TRADE ROUTE PROPERTIES</h3>
+      <label>ID</label>
+      <input id="tradeId" type="text" readonly>
+
+      <div class="row">
+        <div>
+          <label>From</label>
+          <input id="tradeFrom" type="text" readonly>
+        </div>
+        <div>
+          <label>To</label>
+          <input id="tradeTo" type="text" readonly>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Good carried</label>
+          <select id="tradeGood"></select>
+        </div>
+        <div>
+          <label>Capacity</label>
+          <input id="tradeCapacity" type="number" min="0" value="20">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Travel days</label>
+          <input id="tradeDays" type="number" min="0" step="0.1" value="2">
+        </div>
+        <div>
+          <label>Danger</label>
+          <input id="tradeDanger" type="number" min="0" max="10" step="1" value="1">
+        </div>
+      </div>
+
+      <label>Notes</label>
+      <textarea id="tradeNotes"></textarea>
+
+      <div class="row">
+        <button id="applyTradeBtn">Apply</button>
+        <button id="reverseTradeBtn">Reverse</button>
+      </div>
+    </div>
+
+    <hr>
+    <h3>SELECTION</h3>
+    <div id="selectionInfo" class="mini">No selection.</div>
+
+    <hr>
+    <h3>STATS</h3>
+    <div id="statsInfo" class="mini"></div>
+  </div>
+
+  <div id="ioPanel" class="panel">
+    <textarea id="jsonBox" spellcheck="false"></textarea>
+  </div>
+
+  <div id="statusBox"></div>
+
+  <svg id="canvas" viewBox="0 0 3000 2000">
+    <g id="viewport">
+      <g id="gridLayer"></g>
+      <g id="connectionsLayer"></g>
+      <g id="tradeLayer"></g>
+      <g id="nodesLayer"></g>
+    </g>
+  </svg>
+</div>
+
+<script>
+(function(){
+  const WORLD_W = 3000;
+  const WORLD_H = 2000;
+
+  const svg = document.getElementById('canvas');
+  const viewport = document.getElementById('viewport');
+  const gridLayer = document.getElementById('gridLayer');
+  const connectionsLayer = document.getElementById('connectionsLayer');
+  const tradeLayer = document.getElementById('tradeLayer');
+  const nodesLayer = document.getElementById('nodesLayer');
+  const jsonBox = document.getElementById('jsonBox');
+  const statusBox = document.getElementById('statusBox');
+  const selectionInfo = document.getElementById('selectionInfo');
+  const statsInfo = document.getElementById('statsInfo');
+  const locationSection = document.getElementById('locationSection');
+  const tradeSection = document.getElementById('tradeSection');
+
+  const els = {
+    modeSelectBtn: document.getElementById('modeSelectBtn'),
+    modeAddBtn: document.getElementById('modeAddBtn'),
+    modeConnectBtn: document.getElementById('modeConnectBtn'),
+    modeTradeBtn: document.getElementById('modeTradeBtn'),
+    modeDeleteLinkBtn: document.getElementById('modeDeleteLinkBtn'),
+    fitViewBtn: document.getElementById('fitViewBtn'),
+    resetViewBtn: document.getElementById('resetViewBtn'),
+    deleteNodeBtn: document.getElementById('deleteNodeBtn'),
+    deleteTradeBtn: document.getElementById('deleteTradeBtn'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    newMapBtn: document.getElementById('newMapBtn'),
+    newType: document.getElementById('newType'),
+    newSize: document.getElementById('newSize'),
+    showGrid: document.getElementById('showGrid'),
+    snapToGrid: document.getElementById('snapToGrid'),
+    gridSize: document.getElementById('gridSize'),
+
+    newResourceId: document.getElementById('newResourceId'),
+    newResourceName: document.getElementById('newResourceName'),
+    addResourceBtn: document.getElementById('addResourceBtn'),
+    newGoodId: document.getElementById('newGoodId'),
+    newGoodName: document.getElementById('newGoodName'),
+    addGoodBtn: document.getElementById('addGoodBtn'),
+    newGuildId: document.getElementById('newGuildId'),
+    newGuildName: document.getElementById('newGuildName'),
+    addGuildBtn: document.getElementById('addGuildBtn'),
+    resourceDefs: document.getElementById('resourceDefs'),
+    goodDefs: document.getElementById('goodDefs'),
+    guildDefs: document.getElementById('guildDefs'),
+
+    propId: document.getElementById('propId'),
+    propName: document.getElementById('propName'),
+    propDesc: document.getElementById('propDesc'),
+    propType: document.getElementById('propType'),
+    propSize: document.getElementById('propSize'),
+    propX: document.getElementById('propX'),
+    propY: document.getElementById('propY'),
+    propSpeed: document.getElementById('propSpeed'),
+    propRegion: document.getElementById('propRegion'),
+    applyPropsBtn: document.getElementById('applyPropsBtn'),
+    duplicateNodeBtn: document.getElementById('duplicateNodeBtn'),
+
+    resourceSelect: document.getElementById('resourceSelect'),
+    resourceAmount: document.getElementById('resourceAmount'),
+    addResourceToLocationBtn: document.getElementById('addResourceToLocationBtn'),
+    locationResources: document.getElementById('locationResources'),
+
+    goodSelect: document.getElementById('goodSelect'),
+    goodAmount: document.getElementById('goodAmount'),
+    addGoodToLocationBtn: document.getElementById('addGoodToLocationBtn'),
+    locationGoods: document.getElementById('locationGoods'),
+
+    guildSelect: document.getElementById('guildSelect'),
+    addGuildToLocationBtn: document.getElementById('addGuildToLocationBtn'),
+    locationGuilds: document.getElementById('locationGuilds'),
+
+    tradeId: document.getElementById('tradeId'),
+    tradeFrom: document.getElementById('tradeFrom'),
+    tradeTo: document.getElementById('tradeTo'),
+    tradeGood: document.getElementById('tradeGood'),
+    tradeCapacity: document.getElementById('tradeCapacity'),
+    tradeDays: document.getElementById('tradeDays'),
+    tradeDanger: document.getElementById('tradeDanger'),
+    tradeNotes: document.getElementById('tradeNotes'),
+    applyTradeBtn: document.getElementById('applyTradeBtn'),
+    reverseTradeBtn: document.getElementById('reverseTradeBtn')
+  };
+
+  let mode = 'select';
+  let locations = [];
+  let connections = [];
+  let tradeRoutes = [];
+  let resources = [];
+  let goods = [];
+  let guilds = [];
+  let selectedNodeId = null;
+  let selectedConnectionIndex = null;
+  let selectedTradeId = null;
+  let chainStartId = null;
+  let dragNodeId = null;
+  let panState = { dragging:false, startX:0, startY:0, originX:0, originY:0 };
+  const view = { x:0, y:0, scale:1 };
+
+  function nextId(prefix, collection, pattern){
+    let max = 0;
+    for(const item of collection){
+      const m = pattern.exec(String(item.id || ''));
+      if(m) max = Math.max(max, Number(m[1]));
+    }
+    return prefix + (max + 1);
+  }
+
+  function nextLocationId(){ return nextId('loc', locations, /^loc(\d+)$/); }
+  function nextTradeId(){ return nextId('tr', tradeRoutes, /^tr(\d+)$/); }
+
+  function defaultMap(){
+    return {
+      resources:[
+        {id:'wood', name:'Wood'},
+        {id:'iron', name:'Iron Ore'},
+        {id:'fish', name:'Fish'}
+      ],
+      goods:[
+        {id:'tools', name:'Tools'},
+        {id:'weapons', name:'Weapons'},
+        {id:'cloth', name:'Cloth'}
+      ],
+      guilds:[
+        {id:'adventurers', name:'Adventurers Guild'},
+        {id:'miners', name:'Miners Guild'}
+      ],
+      locations:[
+        { id:'loc1', name:'Guild Hall', desc:'Main guild headquarters.', type:'city', x:1500, y:1000, size:18, speed:100, region:'Central', resources:{wood:20}, goods:{tools:10}, guilds:['adventurers'] },
+        { id:'loc2', name:'Dark Forest', desc:'Dangerous woods full of contracts.', type:'wild', x:980, y:760, size:18, speed:90, region:'West', resources:{wood:90, fish:15}, goods:{}, guilds:[] },
+        { id:'loc3', name:'Ancient Ruins', desc:'Broken stone halls and old secrets.', type:'dungeon', x:2160, y:700, size:18, speed:80, region:'East', resources:{iron:20}, goods:{weapons:2}, guilds:['miners'] }
+      ],
+      connections:[['loc1','loc2'], ['loc1','loc3']],
+      tradeRoutes:[
+        {id:'tr1', from:'loc1', to:'loc2', goodId:'tools', capacity:15, travelDays:2, danger:1, notes:'Supply line'}
+      ]
+    };
+  }
+
+  function normalizeDefinition(item, fallbackName){
+    return { id:String(item.id || ''), name:String(item.name || fallbackName || item.id || '') };
+  }
+
+  function normalizeLocation(loc){
+    return {
+      id: String(loc.id || nextLocationId()),
+      name: String(loc.name || 'New Location'),
+      desc: String(loc.desc || ''),
+      type: ['city','wild','dungeon','player'].includes(loc.type) ? loc.type : 'wild',
+      x: Number(loc.x ?? 0),
+      y: Number(loc.y ?? 0),
+      size: Math.max(10, Number(loc.size ?? 18)),
+      speed: Math.max(0, Number(loc.speed ?? 100)),
+      region: String(loc.region || ''),
+      resources: normalizeInventory(loc.resources),
+      goods: normalizeInventory(loc.goods),
+      guilds: Array.isArray(loc.guilds) ? loc.guilds.map(String) : []
+    };
+  }
+
+  function normalizeInventory(inv){
+    const out = {};
+    if(inv && typeof inv === 'object'){
+      for(const [k,v] of Object.entries(inv)){
+        const n = Number(v);
+        if(Number.isFinite(n) && n !== 0) out[String(k)] = n;
+      }
+    }
+    return out;
+  }
+
+  function normalizeTradeRoute(route){
+    return {
+      id: String(route.id || nextTradeId()),
+      from: String(route.from || ''),
+      to: String(route.to || ''),
+      goodId: String(route.goodId || ''),
+      capacity: Math.max(0, Number(route.capacity ?? 10)),
+      travelDays: Math.max(0, Number(route.travelDays ?? 1)),
+      danger: Math.max(0, Number(route.danger ?? 0)),
+      notes: String(route.notes || '')
+    };
+  }
+
+  function ensureUniqueIds(){
+    const seenLoc = new Set();
+    for(const loc of locations){
+      let id = String(loc.id || nextLocationId());
+      while(seenLoc.has(id)) id = nextLocationId();
+      if(id !== loc.id){
+        const oldId = loc.id;
+        loc.id = id;
+        for(const c of connections){
+          if(c[0] === oldId) c[0] = id;
+          if(c[1] === oldId) c[1] = id;
+        }
+        for(const tr of tradeRoutes){
+          if(tr.from === oldId) tr.from = id;
+          if(tr.to === oldId) tr.to = id;
+        }
+      }
+      seenLoc.add(id);
+    }
+
+    const seenTrade = new Set();
+    for(const tr of tradeRoutes){
+      let id = String(tr.id || nextTradeId());
+      while(seenTrade.has(id)) id = nextTradeId();
+      tr.id = id;
+      seenTrade.add(id);
+    }
+  }
+
+  function loadMapData(map){
+    resources = Array.isArray(map.resources) ? map.resources.map(d => normalizeDefinition(d, 'Resource')) : [];
+    goods = Array.isArray(map.goods) ? map.goods.map(d => normalizeDefinition(d, 'Good')) : [];
+    guilds = Array.isArray(map.guilds) ? map.guilds.map(d => normalizeDefinition(d, 'Guild')) : [];
+    locations = Array.isArray(map.locations) ? map.locations.map(normalizeLocation) : [];
+    connections = Array.isArray(map.connections) ? map.connections.filter(c => Array.isArray(c) && c.length === 2).map(c => [String(c[0]), String(c[1])]) : [];
+    tradeRoutes = Array.isArray(map.tradeRoutes) ? map.tradeRoutes.map(normalizeTradeRoute) : [];
+    ensureUniqueIds();
+    pruneInvalidRefs();
+    selectedNodeId = null;
+    selectedConnectionIndex = null;
+    selectedTradeId = null;
+    chainStartId = null;
+    refreshDefinitionSelectors();
+    render();
+    exportJSON();
+  }
+
+  function pruneInvalidRefs(){
+    const locIds = new Set(locations.map(l => l.id));
+    connections = connections.filter(c => locIds.has(c[0]) && locIds.has(c[1]) && c[0] !== c[1]);
+    tradeRoutes = tradeRoutes.filter(tr => locIds.has(tr.from) && locIds.has(tr.to) && tr.from !== tr.to);
+    const resourceIds = new Set(resources.map(r => r.id));
+    const goodIds = new Set(goods.map(g => g.id));
+    const guildIds = new Set(guilds.map(g => g.id));
+    for(const loc of locations){
+      for(const k of Object.keys(loc.resources)) if(!resourceIds.has(k)) delete loc.resources[k];
+      for(const k of Object.keys(loc.goods)) if(!goodIds.has(k)) delete loc.goods[k];
+      loc.guilds = loc.guilds.filter(g => guildIds.has(g));
+    }
+    tradeRoutes = tradeRoutes.filter(tr => !tr.goodId || goodIds.has(tr.goodId));
+  }
+
+  function createSvg(tag){ return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+  function getNode(id){ return locations.find(l => l.id === id) || null; }
+  function getTrade(id){ return tradeRoutes.find(t => t.id === id) || null; }
+  function getDefName(arr, id){ const found = arr.find(x => x.id === id); return found ? found.name : id; }
+
+  function applyTransform(){ viewport.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.scale})`); }
+
+  function screenToWorld(evt){
+    const rect = svg.getBoundingClientRect();
+    const sx = (evt.clientX - rect.left) * (WORLD_W / rect.width);
+    const sy = (evt.clientY - rect.top) * (WORLD_H / rect.height);
+    return { x:(sx - view.x) / view.scale, y:(sy - view.y) / view.scale };
+  }
+
+  function snapPoint(p){
+    if(!els.snapToGrid.checked) return p;
+    const step = Math.max(10, Number(els.gridSize.value || 100));
+    return { x:Math.round(p.x / step) * step, y:Math.round(p.y / step) * step };
+  }
+
+  function setMode(m){
+    mode = m;
+    chainStartId = null;
+    els.modeSelectBtn.classList.toggle('activeMode', m === 'select');
+    els.modeAddBtn.classList.toggle('activeMode', m === 'add');
+    els.modeConnectBtn.classList.toggle('activeMode', m === 'connect');
+    els.modeTradeBtn.classList.toggle('activeMode', m === 'trade');
+    els.modeDeleteLinkBtn.classList.toggle('activeMode', m === 'deleteLink');
+    updateStatus();
+  }
+
+  function updateStatus(){
+    const routeHint = goods.length ? `Trade mode uses the currently selected good (${getDefName(goods, els.tradeGood.value || goods[0]?.id || '') || 'none'}).` : 'Add goods first if you want route payloads.';
+    statusBox.textContent = [
+      `Mode: ${mode}.`,
+      selectedNodeId ? `Selected node: ${selectedNodeId}.` : selectedTradeId ? `Selected trade route: ${selectedTradeId}.` : 'Nothing selected.',
+      routeHint
+    ].join(' ');
+  }
+
+  function drawGrid(){
+    gridLayer.innerHTML = '';
+    if(!els.showGrid.checked) return;
+    const step = Math.max(10, Number(els.gridSize.value || 100));
+    for(let x = 0; x <= WORLD_W; x += step){
+      const line = createSvg('line');
+      line.setAttribute('class', 'grid-line');
+      line.setAttribute('x1', x); line.setAttribute('y1', 0); line.setAttribute('x2', x); line.setAttribute('y2', WORLD_H);
+      gridLayer.appendChild(line);
+    }
+    for(let y = 0; y <= WORLD_H; y += step){
+      const line = createSvg('line');
+      line.setAttribute('class', 'grid-line');
+      line.setAttribute('x1', 0); line.setAttribute('y1', y); line.setAttribute('x2', WORLD_W); line.setAttribute('y2', y);
+      gridLayer.appendChild(line);
+    }
+  }
+
+  function distance(a, b){
+    const dx = b.x - a.x, dy = b.y - a.y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  function drawConnections(){
+    connectionsLayer.innerHTML = '';
+    connections.forEach((c, idx) => {
+      const a = getNode(c[0]); const b = getNode(c[1]);
+      if(!a || !b) return;
+      const line = createSvg('line');
+      line.setAttribute('class', 'map-path' + (idx === selectedConnectionIndex ? ' selected' : ''));
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y); line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+      line.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        selectedConnectionIndex = idx;
+        selectedNodeId = null;
+        selectedTradeId = null;
+        refreshPropertyPanels();
+        render();
+      });
+      connectionsLayer.appendChild(line);
+    });
+  }
+
+  function drawTradeRoutes(){
+    tradeLayer.innerHTML = '';
+    tradeRoutes.forEach((tr) => {
+      const a = getNode(tr.from); const b = getNode(tr.to);
+      if(!a || !b) return;
+      const line = createSvg('line');
+      line.setAttribute('class', 'trade-path' + (tr.id === selectedTradeId ? ' selected' : ''));
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y); line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+      line.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        selectedTradeId = tr.id;
+        selectedNodeId = null;
+        selectedConnectionIndex = null;
+        refreshPropertyPanels();
+        render();
+      });
+      tradeLayer.appendChild(line);
+    });
+  }
+
+  function drawNodes(){
+    nodesLayer.innerHTML = '';
+    locations.forEach((loc) => {
+      const g = createSvg('g');
+      let cls = 'location ' + loc.type;
+      if(loc.id === selectedNodeId) cls += ' selected';
+      g.setAttribute('class', cls);
+
+      const outer = createSvg('circle');
+      outer.setAttribute('class', 'outer');
+      outer.setAttribute('cx', loc.x); outer.setAttribute('cy', loc.y); outer.setAttribute('r', loc.size + 5);
+
+      const core = createSvg('circle');
+      core.setAttribute('class', 'core');
+      core.setAttribute('cx', loc.x); core.setAttribute('cy', loc.y); core.setAttribute('r', loc.size);
+
+      const label = createSvg('text');
+      label.setAttribute('class', 'location-label');
+      label.setAttribute('x', loc.x); label.setAttribute('y', loc.y + loc.size + 18);
+      label.textContent = loc.name;
+
+      const sub = createSvg('text');
+      sub.setAttribute('class', 'subtext');
+      sub.setAttribute('x', loc.x); sub.setAttribute('y', loc.y + loc.size + 30);
+      const chips = [];
+      if(Object.keys(loc.resources).length) chips.push(`${Object.keys(loc.resources).length} res`);
+      if(Object.keys(loc.goods).length) chips.push(`${Object.keys(loc.goods).length} goods`);
+      if(loc.guilds.length) chips.push(`${loc.guilds.length} guilds`);
+      sub.textContent = chips.join(' • ');
+
+      g.appendChild(outer); g.appendChild(core); g.appendChild(label); g.appendChild(sub);
+      nodesLayer.appendChild(g);
+
+      g.addEventListener('mousedown', (evt) => {
+        evt.stopPropagation();
+        if(mode === 'select'){
+          selectedNodeId = loc.id;
+          selectedConnectionIndex = null;
+          selectedTradeId = null;
+          dragNodeId = loc.id;
+          refreshPropertyPanels();
+          render();
+        }
+      });
+
+      g.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        if(mode === 'select'){
+          selectedNodeId = loc.id;
+          selectedConnectionIndex = null;
+          selectedTradeId = null;
+          refreshPropertyPanels();
+          render();
+          return;
+        }
+        if(mode === 'connect'){
+          handlePairAction(loc.id, 'connect');
+          return;
+        }
+        if(mode === 'deleteLink'){
+          handlePairAction(loc.id, 'deleteLink');
+          return;
+        }
+        if(mode === 'trade'){
+          handlePairAction(loc.id, 'trade');
+        }
+      });
+    });
+  }
+
+  function handlePairAction(nodeId, kind){
+    if(!chainStartId){
+      chainStartId = nodeId;
+      selectedNodeId = nodeId;
+      refreshPropertyPanels();
+      updateStatus();
+      return;
+    }
+    if(chainStartId === nodeId){
+      chainStartId = null;
+      updateStatus();
+      return;
+    }
+    const a = chainStartId;
+    const b = nodeId;
+    if(kind === 'connect'){
+      const exists = connections.some(c => (c[0] === a && c[1] === b) || (c[0] === b && c[1] === a));
+      if(!exists) connections.push([a,b]);
+    } else if(kind === 'deleteLink'){
+      connections = connections.filter(c => !((c[0] === a && c[1] === b) || (c[0] === b && c[1] === a)));
+      tradeRoutes = tradeRoutes.filter(tr => !((tr.from === a && tr.to === b) || (tr.from === b && tr.to === a)));
+    } else if(kind === 'trade'){
+      const goodId = els.tradeGood.value || (goods[0] ? goods[0].id : '');
+      tradeRoutes.push({ id:nextTradeId(), from:a, to:b, goodId, capacity:20, travelDays:estimateTravelDays(a,b), danger:1, notes:'' });
+      selectedTradeId = tradeRoutes[tradeRoutes.length - 1].id;
+      selectedNodeId = null;
+      selectedConnectionIndex = null;
+    }
+    chainStartId = null;
+    refreshPropertyPanels();
+    render();
+  }
+
+  function estimateTravelDays(fromId, toId){
+    const a = getNode(fromId), b = getNode(toId);
+    if(!a || !b) return 1;
+    const avgSpeed = Math.max(1, ((a.speed || 100) + (b.speed || 100)) / 2);
+    return Number((distance(a,b) / avgSpeed / 5).toFixed(1));
+  }
+
+  function refreshPropertyPanels(){
+    const node = getNode(selectedNodeId);
+    const trade = getTrade(selectedTradeId);
+    locationSection.style.display = node ? 'block' : 'none';
+    tradeSection.style.display = trade ? 'block' : 'none';
+
+    if(node){
+      els.propId.value = node.id;
+      els.propName.value = node.name;
+      els.propDesc.value = node.desc;
+      els.propType.value = node.type;
+      els.propSize.value = node.size;
+      els.propX.value = Math.round(node.x);
+      els.propY.value = Math.round(node.y);
+      els.propSpeed.value = node.speed;
+      els.propRegion.value = node.region;
+      renderLocationInventories(node);
+    }
+    if(trade){
+      els.tradeId.value = trade.id;
+      els.tradeFrom.value = getNode(trade.from)?.name || trade.from;
+      els.tradeTo.value = getNode(trade.to)?.name || trade.to;
+      els.tradeGood.value = trade.goodId;
+      els.tradeCapacity.value = trade.capacity;
+      els.tradeDays.value = trade.travelDays;
+      els.tradeDanger.value = trade.danger;
+      els.tradeNotes.value = trade.notes;
+    }
+
+    if(!node && !trade){
+      selectionInfo.textContent = selectedConnectionIndex != null ? `Connection selected between ${connections[selectedConnectionIndex][0]} and ${connections[selectedConnectionIndex][1]}.` : 'No selection.';
+    } else if(node){
+      selectionInfo.textContent = `${node.name} (${node.id}) • ${node.type} • ${Math.round(node.x)}, ${Math.round(node.y)}`;
+    } else if(trade){
+      selectionInfo.textContent = `Trade route ${trade.id}: ${getNode(trade.from)?.name || trade.from} → ${getNode(trade.to)?.name || trade.to}`;
+    }
+
+    statsInfo.innerHTML = [
+      `${locations.length} locations`,
+      `${connections.length} physical links`,
+      `${tradeRoutes.length} trade routes`,
+      `${resources.length} resources`,
+      `${goods.length} goods`,
+      `${guilds.length} guilds`
+    ].join(' • ');
+
+    updateStatus();
+  }
+
+  function renderLocationInventories(node){
+    renderInventoryList(els.locationResources, node.resources, resources, 'resource');
+    renderInventoryList(els.locationGoods, node.goods, goods, 'good');
+    renderGuildList(els.locationGuilds, node.guilds);
+  }
+
+  function renderInventoryList(container, inventory, defs, kind){
+    container.innerHTML = '';
+    const entries = Object.entries(inventory);
+    if(!entries.length){
+      container.textContent = `No ${kind}s yet.`;
+      return;
+    }
+    for(const [id, amount] of entries){
+      const row = document.createElement('div'); row.className = 'list-item';
+      const left = document.createElement('div'); left.className = 'left';
+      const strong = document.createElement('strong'); strong.textContent = getDefName(defs, id);
+      const span = document.createElement('span'); span.textContent = `${id} • amount ${amount}`;
+      left.appendChild(strong); left.appendChild(span);
+      const right = document.createElement('div'); right.className = 'row'; right.style.margin = '0'; right.style.flex = '0 0 auto';
+      const minus = document.createElement('button'); minus.className = 'smallbtn'; minus.textContent = '-';
+      minus.onclick = () => adjustInventory(kind, id, -1);
+      const plus = document.createElement('button'); plus.className = 'smallbtn'; plus.textContent = '+';
+      plus.onclick = () => adjustInventory(kind, id, 1);
+      const del = document.createElement('button'); del.className = 'smallbtn'; del.textContent = 'X';
+      del.onclick = () => removeInventory(kind, id);
+      right.appendChild(minus); right.appendChild(plus); right.appendChild(del);
+      row.appendChild(left); row.appendChild(right); container.appendChild(row);
+    }
+  }
+
+  function renderGuildList(container, guildIds){
+    container.innerHTML = '';
+    if(!guildIds.length){ container.textContent = 'No guilds yet.'; return; }
+    guildIds.forEach((id) => {
+      const row = document.createElement('div'); row.className = 'list-item';
+      const left = document.createElement('div'); left.className = 'left';
+      const strong = document.createElement('strong'); strong.textContent = getDefName(guilds, id);
+      const span = document.createElement('span'); span.textContent = id;
+      left.appendChild(strong); left.appendChild(span);
+      const del = document.createElement('button'); del.className = 'smallbtn'; del.textContent = 'Remove';
+      del.onclick = () => removeGuildFromLocation(id);
+      row.appendChild(left); row.appendChild(del);
+      container.appendChild(row);
+    });
+  }
+
+  function adjustInventory(kind, id, delta){
+    const node = getNode(selectedNodeId); if(!node) return;
+    const target = kind === 'resource' ? node.resources : node.goods;
+    target[id] = (target[id] || 0) + delta;
+    if(target[id] <= 0) delete target[id];
+    refreshPropertyPanels();
+    render();
+  }
+
+  function removeInventory(kind, id){
+    const node = getNode(selectedNodeId); if(!node) return;
+    if(kind === 'resource') delete node.resources[id]; else delete node.goods[id];
+    refreshPropertyPanels(); render();
+  }
+
+  function removeGuildFromLocation(id){
+    const node = getNode(selectedNodeId); if(!node) return;
+    node.guilds = node.guilds.filter(g => g !== id);
+    refreshPropertyPanels(); render();
+  }
+
+  function refreshDefinitionSelectors(){
+    fillSelect(els.resourceSelect, resources, '(no resources)');
+    fillSelect(els.goodSelect, goods, '(no goods)');
+    fillSelect(els.guildSelect, guilds, '(no guilds)');
+    fillSelect(els.tradeGood, goods, '(no goods)');
+    renderDefinitionList(els.resourceDefs, resources, 'resource');
+    renderDefinitionList(els.goodDefs, goods, 'good');
+    renderDefinitionList(els.guildDefs, guilds, 'guild');
+    pruneInvalidRefs();
+  }
+
+  function fillSelect(select, defs, emptyLabel){
+    const prev = select.value;
+    select.innerHTML = '';
+    if(!defs.length){
+      const opt = document.createElement('option'); opt.value = ''; opt.textContent = emptyLabel; select.appendChild(opt); return;
+    }
+    defs.forEach((def) => {
+      const opt = document.createElement('option'); opt.value = def.id; opt.textContent = `${def.name} (${def.id})`; select.appendChild(opt);
+    });
+    if([...select.options].some(o => o.value === prev)) select.value = prev;
+  }
+
+  function renderDefinitionList(container, defs, kind){
+    container.innerHTML = '';
+    if(!defs.length){ container.textContent = `No ${kind} definitions yet.`; return; }
+    defs.forEach((def) => {
+      const row = document.createElement('div'); row.className = 'list-item';
+      const left = document.createElement('div'); left.className = 'left';
+      const strong = document.createElement('strong'); strong.textContent = def.name;
+      const span = document.createElement('span'); span.textContent = def.id;
+      left.appendChild(strong); left.appendChild(span);
+      const del = document.createElement('button'); del.className = 'smallbtn'; del.textContent = 'X';
+      del.onclick = () => deleteDefinition(kind, def.id);
+      row.appendChild(left); row.appendChild(del); container.appendChild(row);
+    });
+  }
+
+  function deleteDefinition(kind, id){
+    if(kind === 'resource') resources = resources.filter(x => x.id !== id);
+    if(kind === 'good') goods = goods.filter(x => x.id !== id);
+    if(kind === 'guild') guilds = guilds.filter(x => x.id !== id);
+    pruneInvalidRefs();
+    refreshDefinitionSelectors();
+    refreshPropertyPanels();
+    render();
+  }
+
+  function addDefinition(kind){
+    const idEl = kind === 'resource' ? els.newResourceId : kind === 'good' ? els.newGoodId : els.newGuildId;
+    const nameEl = kind === 'resource' ? els.newResourceName : kind === 'good' ? els.newGoodName : els.newGuildName;
+    const id = idEl.value.trim();
+    const name = nameEl.value.trim();
+    if(!id || !name) return;
+    const collection = kind === 'resource' ? resources : kind === 'good' ? goods : guilds;
+    if(collection.some(x => x.id === id)){
+      alert('Definition id already exists.');
+      return;
+    }
+    collection.push({id, name});
+    idEl.value = ''; nameEl.value = '';
+    refreshDefinitionSelectors();
+    refreshPropertyPanels();
+    exportJSON();
+  }
+
+  function render(){
+    drawGrid();
+    drawConnections();
+    drawTradeRoutes();
+    drawNodes();
+    applyTransform();
+    refreshPropertyPanels();
+    exportJSON();
+  }
+
+  function addNodeAt(point){
+    const p = snapPoint(point);
+    const node = normalizeLocation({
+      id: nextLocationId(),
+      name: 'New Location',
+      desc: '',
+      type: els.newType.value,
+      x: clamp(p.x, 0, WORLD_W),
+      y: clamp(p.y, 0, WORLD_H),
+      size: Math.max(10, Number(els.newSize.value || 18)),
+      speed: 100,
+      region: '',
+      resources: {},
+      goods: {},
+      guilds: []
+    });
+    locations.push(node);
+    selectedNodeId = node.id;
+    selectedTradeId = null;
+    selectedConnectionIndex = null;
+    render();
+  }
+
+  function exportJSON(){
+    const payload = { resources, goods, guilds, locations, connections, tradeRoutes };
+    jsonBox.value = JSON.stringify(payload, null, 2);
+  }
+
+  function importJSON(){
+    try{
+      loadMapData(JSON.parse(jsonBox.value));
+    }catch(err){
+      alert('Invalid JSON');
+    }
+  }
+
+  function fitView(){
+    if(!locations.length){ view.x = 0; view.y = 0; view.scale = 1; applyTransform(); return; }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for(const loc of locations){
+      minX = Math.min(minX, loc.x - loc.size - 40);
+      minY = Math.min(minY, loc.y - loc.size - 40);
+      maxX = Math.max(maxX, loc.x + loc.size + 40);
+      maxY = Math.max(maxY, loc.y + loc.size + 60);
+    }
+    const width = Math.max(200, maxX - minX);
+    const height = Math.max(200, maxY - minY);
+    const scaleX = WORLD_W / width;
+    const scaleY = WORLD_H / height;
+    view.scale = clamp(Math.min(scaleX, scaleY) * 0.85, 0.2, 3.5);
+    view.x = -minX * view.scale + (WORLD_W - width * view.scale) / 2;
+    view.y = -minY * view.scale + (WORLD_H - height * view.scale) / 2;
+    applyTransform();
+  }
+
+  function deleteSelectedNode(){
+    if(!selectedNodeId) return;
+    const id = selectedNodeId;
+    locations = locations.filter(l => l.id !== id);
+    connections = connections.filter(c => c[0] !== id && c[1] !== id);
+    tradeRoutes = tradeRoutes.filter(tr => tr.from !== id && tr.to !== id);
+    selectedNodeId = null;
+    render();
+  }
+
+  function deleteSelectedTrade(){
+    if(!selectedTradeId) return;
+    tradeRoutes = tradeRoutes.filter(tr => tr.id !== selectedTradeId);
+    selectedTradeId = null;
+    render();
+  }
+
+  function applySelectedNodeProps(){
+    const node = getNode(selectedNodeId); if(!node) return;
+    node.name = els.propName.value.trim() || 'Unnamed';
+    node.desc = els.propDesc.value;
+    node.type = els.propType.value;
+    node.size = Math.max(10, Number(els.propSize.value || 18));
+    node.x = clamp(Number(els.propX.value || node.x), 0, WORLD_W);
+    node.y = clamp(Number(els.propY.value || node.y), 0, WORLD_H);
+    if(els.snapToGrid.checked){
+      const p = snapPoint({x:node.x, y:node.y}); node.x = p.x; node.y = p.y;
+    }
+    node.speed = Math.max(0, Number(els.propSpeed.value || 100));
+    node.region = els.propRegion.value;
+    render();
+  }
+
+  function duplicateSelectedNode(){
+    const node = getNode(selectedNodeId); if(!node) return;
+    const copy = JSON.parse(JSON.stringify(node));
+    copy.id = nextLocationId();
+    copy.name = node.name + ' Copy';
+    copy.x = clamp(node.x + 80, 0, WORLD_W);
+    copy.y = clamp(node.y + 80, 0, WORLD_H);
+    locations.push(copy);
+    selectedNodeId = copy.id;
+    render();
+  }
+
+  function applySelectedTradeProps(){
+    const tr = getTrade(selectedTradeId); if(!tr) return;
+    tr.goodId = els.tradeGood.value;
+    tr.capacity = Math.max(0, Number(els.tradeCapacity.value || 0));
+    tr.travelDays = Math.max(0, Number(els.tradeDays.value || 0));
+    tr.danger = Math.max(0, Number(els.tradeDanger.value || 0));
+    tr.notes = els.tradeNotes.value;
+    render();
+  }
+
+  function reverseSelectedTrade(){
+    const tr = getTrade(selectedTradeId); if(!tr) return;
+    const tmp = tr.from; tr.from = tr.to; tr.to = tmp; render();
+  }
+
+  function addInventoryToLocation(kind){
+    const node = getNode(selectedNodeId); if(!node) return;
+    const id = kind === 'resource' ? els.resourceSelect.value : els.goodSelect.value;
+    if(!id) return;
+    const amount = Number(kind === 'resource' ? els.resourceAmount.value : els.goodAmount.value);
+    if(!Number.isFinite(amount) || amount === 0) return;
+    const target = kind === 'resource' ? node.resources : node.goods;
+    target[id] = (target[id] || 0) + amount;
+    refreshPropertyPanels(); render();
+  }
+
+  function addGuildToLocation(){
+    const node = getNode(selectedNodeId); if(!node) return;
+    const id = els.guildSelect.value; if(!id) return;
+    if(!node.guilds.includes(id)) node.guilds.push(id);
+    refreshPropertyPanels(); render();
+  }
+
+  svg.addEventListener('mousedown', (evt) => {
+    const point = screenToWorld(evt);
+    if(mode === 'add' && !evt.target.closest('.location')){
+      addNodeAt(point);
+      return;
+    }
+    if(mode === 'select' && !evt.target.closest('.location')){
+      panState.dragging = true;
+      svg.classList.add('dragging');
+      panState.startX = evt.clientX; panState.startY = evt.clientY;
+      panState.originX = view.x; panState.originY = view.y;
+      if(!evt.target.closest('.trade-path') && !evt.target.closest('.map-path')){
+        selectedNodeId = null; selectedTradeId = null; selectedConnectionIndex = null;
+        refreshPropertyPanels(); render();
+      }
+    }
+  });
+
+  window.addEventListener('mousemove', (evt) => {
+    if(dragNodeId){
+      const node = getNode(dragNodeId); if(!node) return;
+      const p = snapPoint(screenToWorld(evt));
+      node.x = clamp(p.x, 0, WORLD_W); node.y = clamp(p.y, 0, WORLD_H);
+      render();
+      return;
+    }
+    if(panState.dragging){
+      const rect = svg.getBoundingClientRect();
+      const dx = (evt.clientX - panState.startX) * (WORLD_W / rect.width);
+      const dy = (evt.clientY - panState.startY) * (WORLD_H / rect.height);
+      view.x = panState.originX + dx; view.y = panState.originY + dy; applyTransform();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragNodeId = null;
+    panState.dragging = false;
+    svg.classList.remove('dragging');
+  });
+
+  svg.addEventListener('wheel', (evt) => {
+    evt.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (evt.clientX - rect.left) * (WORLD_W / rect.width);
+    const mouseY = (evt.clientY - rect.top) * (WORLD_H / rect.height);
+    const worldX = (mouseX - view.x) / view.scale;
+    const worldY = (mouseY - view.y) / view.scale;
+    if(evt.deltaY < 0) view.scale *= 1.1; else view.scale *= 0.9;
+    view.scale = clamp(view.scale, 0.2, 4.0);
+    view.x = mouseX - worldX * view.scale;
+    view.y = mouseY - worldY * view.scale;
+    applyTransform();
+  }, {passive:false});
+
+  els.modeSelectBtn.onclick = () => setMode('select');
+  els.modeAddBtn.onclick = () => setMode('add');
+  els.modeConnectBtn.onclick = () => setMode('connect');
+  els.modeTradeBtn.onclick = () => setMode('trade');
+  els.modeDeleteLinkBtn.onclick = () => setMode('deleteLink');
+  els.fitViewBtn.onclick = fitView;
+  els.resetViewBtn.onclick = () => { view.x = 0; view.y = 0; view.scale = 1; applyTransform(); };
+  els.deleteNodeBtn.onclick = deleteSelectedNode;
+  els.deleteTradeBtn.onclick = deleteSelectedTrade;
+  els.exportBtn.onclick = exportJSON;
+  els.importBtn.onclick = importJSON;
+  els.newMapBtn.onclick = () => loadMapData(defaultMap());
+  els.applyPropsBtn.onclick = applySelectedNodeProps;
+  els.duplicateNodeBtn.onclick = duplicateSelectedNode;
+  els.applyTradeBtn.onclick = applySelectedTradeProps;
+  els.reverseTradeBtn.onclick = reverseSelectedTrade;
+  els.addResourceBtn.onclick = () => addDefinition('resource');
+  els.addGoodBtn.onclick = () => addDefinition('good');
+  els.addGuildBtn.onclick = () => addDefinition('guild');
+  els.addResourceToLocationBtn.onclick = () => addInventoryToLocation('resource');
+  els.addGoodToLocationBtn.onclick = () => addInventoryToLocation('good');
+  els.addGuildToLocationBtn.onclick = addGuildToLocation;
+  els.showGrid.onchange = render;
+  els.gridSize.onchange = render;
+  els.snapToGrid.onchange = updateStatus;
+
+  loadMapData(defaultMap());
+  refreshDefinitionSelectors();
+  setMode('select');
+  fitView();
+})();
+</script>
+</body>
+</html>

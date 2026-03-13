@@ -3,39 +3,52 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>World Map Editor</title>
+<title>Skill Tree Viewer</title>
 <style>
   :root{
     --bg1:#090b11;
     --bg2:#111624;
-    --panel:rgba(10,14,20,0.94);
-    --panel-border:rgba(255,215,140,0.12);
+    --ring:rgba(180,150,100,0.15);
+    --subring:rgba(100,170,255,0.18);
+    --line:rgba(150,140,120,0.22);
+    --line-active:rgba(255,196,92,0.85);
     --text:#e8dcc0;
     --muted:#a89b82;
-    --line:rgba(150,140,120,0.26);
-    --line-selected:#fff0c6;
     --node-fill:#1c2433;
     --node-stroke:#8b7550;
-    --node-selected:#fff0c6;
-    --city:#7aa8ff;
-    --wild:#9a8f78;
-    --dungeon:#ff7a7a;
-    --player:#5eff9a;
-    --grid:rgba(255,215,140,0.05);
+    --node-glow:rgba(255,190,80,0.22);
+    --node-active-fill:#f0b84d;
+    --node-active-stroke:#fff0c6;
+    --start:#5eff9a;
   }
 
   *{ box-sizing:border-box; }
+
+  @keyframes startPulse{
+    0%{
+      filter:drop-shadow(0 0 0 rgba(120,255,170,0));
+      transform:scale(1);
+    }
+    50%{
+      filter:drop-shadow(0 0 12px rgba(120,255,170,0.6));
+      transform:scale(1.06);
+    }
+    100%{
+      filter:drop-shadow(0 0 0 rgba(120,255,170,0));
+      transform:scale(1);
+    }
+  }
 
   html,body{
     width:100%;
     height:100%;
     margin:0;
     overflow:hidden;
+    background:
+      radial-gradient(circle at center, rgba(255,190,80,0.06) 0%, transparent 18%),
+      radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
     color:var(--text);
     font-family:Arial, Helvetica, sans-serif;
-    background:
-      radial-gradient(circle at center, rgba(255,190,80,0.05) 0%, transparent 18%),
-      radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
   }
 
   #app{
@@ -47,88 +60,115 @@
   .panel{
     position:absolute;
     z-index:10;
-    background:var(--panel);
-    border:1px solid var(--panel-border);
+    background:rgba(10,14,20,0.92);
+    border:1px solid rgba(255,215,140,0.12);
     border-radius:12px;
-    padding:12px;
     box-shadow:0 8px 30px rgba(0,0,0,0.35);
-    backdrop-filter:blur(6px);
+    padding:10px 12px;
+  }
+
+  #rightPanel{
+    top:10px;
+    right:10px;
+    width:260px;
+  }
+
+  #statPanel{
+    margin-top:8px;
+  }
+
+  .stat-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:4px 0;
+    border-bottom:1px solid rgba(255,215,140,0.08);
+    font-size:13px;
+  }
+
+  .stat-name{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:#d9cfae;
+  }
+
+  .stat-value{
+    font-weight:bold;
+    color:#ffe8b0;
+  }
+
+  /* attribute colors */
+  .stat-str .stat-value{ color:#ff7a7a; }
+  .stat-dex .stat-value{ color:#7aff9e; }
+  .stat-int .stat-value{ color:#7ac7ff; }
+  .stat-hp  .stat-value{ color:#ffd26a; }
+
+  /* small icons */
+  .stat-icon{
+    width:14px;
+    text-align:center;
+    opacity:0.85;
   }
 
   #toolbar{
     top:10px;
     left:10px;
-    width:420px;
-    max-height:calc(100vh - 20px);
-    overflow:auto;
+    width:390px;
   }
 
-  #properties{
-    top:10px;
-    right:10px;
-    width:340px;
-    max-height:calc(100vh - 20px);
-    overflow:auto;
-  }
-
-  #ioPanel{
+  #jsonPanel{
     left:10px;
     bottom:10px;
     width:520px;
-    height:220px;
+    height:200px;
   }
 
-  h3{
-    margin:0 0 10px 0;
-    font-size:14px;
-    letter-spacing:0.08em;
-  }
-
-  .row{
-    display:flex;
-    gap:8px;
-    margin-bottom:8px;
-    align-items:end;
-  }
-
-  .row > *{ flex:1; }
-
-  label{
-    display:block;
-    margin:0 0 4px 0;
-    font-size:12px;
-    color:var(--muted);
-  }
-
-  input, select, textarea, button{
+  #app{
     width:100%;
+    height:100%;
+  }
+
+  #jsonBox{
+    width:100%;
+    height:100%;
+    resize:none;
+    background:#0b0f16;
+    color:var(--text);
+    border:1px solid rgba(255,215,140,0.12);
+    border-radius:8px;
+    padding:8px;
+    outline:none;
+    font-family:Consolas, monospace;
+    font-size:12px;
+  }
+
+  button, select{
     background:linear-gradient(180deg, #1b2331, #101620);
     color:var(--text);
     border:1px solid rgba(255,215,140,0.16);
     border-radius:8px;
     padding:8px 10px;
-    outline:none;
-  }
-
-  textarea{
-    min-height:84px;
-    resize:vertical;
   }
 
   button{ cursor:pointer; font-weight:bold; }
   button:hover{ filter:brightness(1.08); }
 
-  .activeMode{ outline:2px solid rgba(255,240,198,0.7); }
-
-  .mini{ color:var(--muted); font-size:12px; line-height:1.35; }
-
-  hr{
-    border:none;
-    border-top:1px solid rgba(255,215,140,0.08);
-    margin:10px 0;
+  .row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:center;
   }
 
-  #canvas{
+  .row > *{ flex:1; }
+
+  .mini{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  svg{
     width:100%;
     height:100%;
     display:block;
@@ -136,785 +176,1152 @@
     user-select:none;
   }
 
-  #canvas.dragging{ cursor:grabbing; }
+  svg.dragging{ cursor:grabbing; }
 
-  .grid-line{
-    stroke:var(--grid);
-    stroke-width:1;
+  .node.start.selectable{
+    cursor:pointer;
   }
 
-  .map-path{
+  .main-ring{
+    fill:none;
+    stroke:var(--ring);
+    stroke-width:2;
+    stroke-dasharray:2 12;
+  }
+
+  .sub-ring{
+    fill:none;
+    stroke:var(--subring);
+    stroke-width:2;
+    stroke-dasharray:3 8;
+  }
+
+  .connection{
     stroke:var(--line);
     stroke-width:4;
     stroke-linecap:round;
+    transition:stroke 0.18s ease, filter 0.18s ease;
   }
 
-  .map-path.selected{
-    stroke:var(--line-selected);
-    stroke-width:5;
+  .connection.active{
+    stroke:var(--line-active);
+    filter:drop-shadow(0 0 6px rgba(255,200,90,0.4));
   }
 
-  .location{ cursor:pointer; }
+  .node{
+    cursor:pointer;
+  }
 
-  .location .outer{
+  .node .outer{
     fill:rgba(10,12,18,0.95);
     stroke:rgba(255,213,129,0.18);
     stroke-width:2;
   }
 
-  .location .core{
+  .node.path .core{
+    stroke:var(--node-stroke);
+  }
+
+  .node.path.highlight .core{
+    stroke:#ff6b6b;
+    stroke-width:3;
+    filter:drop-shadow(0 0 10px rgba(255,80,80,0.5));
+  }
+
+  .node .core{
     fill:var(--node-fill);
     stroke:var(--node-stroke);
     stroke-width:2;
+    transition:fill 0.18s ease, stroke 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+    transform-origin:center;
   }
 
-  .location.city .core{ stroke:var(--city); }
-  .location.wild .core{ stroke:var(--wild); }
-  .location.dungeon .core{ stroke:var(--dungeon); }
-  .location.player .core{ stroke:var(--player); }
-
-  .location.selected .core{
-    stroke:var(--node-selected);
-    stroke-width:3;
-    filter:drop-shadow(0 0 10px rgba(255,240,198,0.4));
+  .node:hover .core{
+    transform:scale(1.08);
+    filter:drop-shadow(0 0 10px var(--node-glow));
   }
 
-  .location-label{
-    fill:#d9ceb6;
-    font-size:12px;
-    text-anchor:middle;
-    pointer-events:none;
+  .node.active .core{
+    fill:var(--node-active-fill);
+    stroke:var(--node-active-stroke);
+    filter:
+      drop-shadow(0 0 7px rgba(255,220,130,0.75))
+      drop-shadow(0 0 16px rgba(255,180,60,0.45));
   }
 
-  .subtext{
-    fill:#998d74;
-    font-size:10px;
-    text-anchor:middle;
-    pointer-events:none;
+  .node.start .core{
+    stroke:var(--start);
   }
 
-  .status{
+  .node.start.selectable .core{
+    animation:startPulse 2.2s ease-in-out infinite;
+    stroke:#8cffc2;
+  }
+
+  .node.disabled .core{
+    filter: grayscale(0.7);
+    opacity:0.6;
+  }
+
+
+  .tooltip{
     position:absolute;
-    right:360px;
-    top:10px;
-    z-index:10;
-    background:rgba(10,14,20,0.8);
-    border:1px solid rgba(255,215,140,0.10);
+    min-width:220px;
+    max-width:280px;
+    pointer-events:none;
+    background:linear-gradient(180deg, rgba(20,16,10,0.96), rgba(8,10,16,0.96));
+    border:1px solid rgba(255,205,120,0.22);
     border-radius:12px;
-    padding:10px 12px;
-    color:var(--muted);
-    font-size:12px;
-    max-width:320px;
+    padding:12px 14px;
+    box-shadow:0 10px 35px rgba(0,0,0,0.55);
+    color:var(--text);
+    opacity:0;
+    transform:translate(12px, 12px);
+    transition:opacity 0.12s ease;
+    z-index:20;
   }
 
-  #jsonBox{
-    width:100%;
-    height:100%;
-    background:#0b0f16;
-    color:var(--text);
-    border:1px solid rgba(255,215,140,0.12);
-    border-radius:8px;
-    resize:none;
-    outline:none;
-    padding:8px;
-    font-family:Consolas, monospace;
+  .tooltip .bonuses{
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px solid rgba(255,205,120,0.18);
+    font-size:13px;
+  }
+
+  .tooltip .requirements{
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px solid rgba(255,100,100,0.25);
+    color:#ffb8b8;
     font-size:12px;
   }
+
+  .tooltip .bonus-line{
+    color:#9fe8a4;
+  }
+
+  .tooltip .req-line{
+    color:#ff9d9d;
+  }
+
+  .tooltip.visible{ opacity:1; }
+  .tooltip .name{ font-weight:bold; margin-bottom:6px; color:#ffe8b0; }
+  .tooltip .type{ font-size:12px; color:#c8b791; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .tooltip .desc{ font-size:13px; line-height:1.45; color:#e6dcc7; }
+
+  .title{
+    position:absolute;
+    top:18px;
+    right:20px;
+    z-index:10;
+    text-align:right;
+    text-shadow:0 2px 12px rgba(0,0,0,0.6);
+  }
+
+  .title h1{
+    margin:0;
+    font-size:18px;
+    letter-spacing:2px;
+  }
+
+  .title p{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .skilltree-btn{
+    position:absolute;
+    top:20px;
+    left:20px;
+    z-index:50;
+    padding:10px 14px;
+    font-weight:bold;
+  }
+
+  .skilltree-menu{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.75);
+    backdrop-filter:blur(4px);
+    z-index:40;
+  }
+
+  .skilltree-menu.hidden{
+    display:none;
+  }
+
+  .skilltree-close{
+    position:absolute;
+    top:20px;
+    right:20px;
+    z-index:50;
+    padding:8px 12px;
+  }
+
+  .skilltree-menu{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.75);
+    backdrop-filter:blur(4px);
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    z-index:40;
+  }
+
+  .skilltree-window{
+    width:1200px;
+    height:750px;
+
+    background:#07090e;
+    border:1px solid rgba(255,215,140,0.2);
+    border-radius:14px;
+
+    overflow:hidden;
+    position:relative;
+
+    box-shadow:0 0 60px rgba(0,0,0,0.8);
+  }
+
+  .skilltree-close{
+    position:absolute;
+    top:12px;
+    right:12px;
+    z-index:50;
+  }
+
+
+
+
+
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="toolbar" class="panel">
-    <h3>WORLD MAP EDITOR</h3>
+<button id="openSkillTreeBtn" class="skilltree-btn">
+  Open Skill Tree
+</button>
+<div id="skillTreeMenu" class="skilltree-menu hidden">
 
-    <div class="row">
-      <button id="modeSelectBtn">Select</button>
-      <button id="modeAddBtn">Add Node</button>
-      <button id="modeConnectBtn">Connect</button>
-      <button id="modeDeleteLinkBtn">Delete Link</button>
-    </div>
+  <div class="skilltree-window">
 
-    <div class="row">
-      <button id="fitViewBtn">Fit View</button>
-      <button id="resetViewBtn">Reset View</button>
-      <button id="deleteNodeBtn">Delete Node</button>
-    </div>
+    <button id="closeSkillTreeBtn" class="skilltree-close">X</button>
 
-    <div class="row">
-      <div>
-        <label>New node type</label>
-        <select id="newType">
-          <option value="city">city</option>
-          <option value="wild" selected>wild</option>
-          <option value="dungeon">dungeon</option>
-          <option value="player">player</option>
-        </select>
+    <div id="app">
+      <div id="toolbar" class="panel">
+        <div class="row">
+          <button id="loadBtn">Load JSON</button>
+          <button id="refundBtn">Refund All</button>
+          <button id="resetViewBtn">Reset View</button>
+        </div>
+        <div class="row">
+          <div>Skill Points: <span id="allocatedCount">0</span></div>
+          <div>Active Start: <span id="activeStartLabel">None</span></div>
+        </div>
+        <div class="mini">
+          Paste editor JSON below, then click Load JSON.
+        </div>
       </div>
-      <div>
-        <label>Node size</label>
-        <input id="newSize" type="number" min="10" max="50" value="18">
-      </div>
-    </div>
 
-    <div class="row">
-      <div>
-        <label><input id="showGrid" type="checkbox" checked style="width:auto; margin-right:6px;">Show grid</label>
+      <div id="jsonPanel" class="panel">
+        <textarea id="jsonBox" spellcheck="false"></textarea>
       </div>
-      <div>
-        <label><input id="snapToGrid" type="checkbox" style="width:auto; margin-right:6px;">Snap to grid</label>
+
+      <div id="rightPanel" class="panel">
+        <h3>PLAYER STATS</h3>
+        <div id="statPanel"></div>
       </div>
-      <div>
-        <label>Grid size</label>
-        <input id="gridSize" type="number" min="20" max="400" value="100">
+
+      <div id="tooltip" class="tooltip">
+        <div class="name"></div>
+        <div class="type"></div>
+        <div class="desc"></div>
+
+        <div class="bonuses"></div>
+        <div class="requirements"></div>
       </div>
-    </div>
 
-    <hr>
-
-    <div class="row">
-      <button id="exportBtn">Export JSON</button>
-      <button id="importBtn">Import JSON</button>
-      <button id="newMapBtn">New Map</button>
-    </div>
-
-    <div class="mini">
-      Select mode: click nodes or drag them. Add mode: click empty space to create a node. Connect/Delete Link: click node A then node B.
-      Pan with empty-space drag. Zoom centers on the mouse. Shift + click in Select mode also starts link selection.
+      <svg id="tree" viewBox="0 0 1600 1000">
+        <g id="viewport">
+          <g id="ringsLayer"></g>
+          <g id="connectionsLayer"></g>
+          <g id="nodesLayer"></g>
+        </g>
+      </svg>
     </div>
   </div>
-
-  <div id="properties" class="panel">
-    <h3>LOCATION PROPERTIES</h3>
-
-    <label>ID</label>
-    <input id="propId" type="text" readonly>
-
-    <label>Name</label>
-    <input id="propName" type="text" placeholder="Location name">
-
-    <label>Description</label>
-    <textarea id="propDesc" placeholder="Description"></textarea>
-
-    <div class="row">
-      <div>
-        <label>Type</label>
-        <select id="propType">
-          <option value="city">city</option>
-          <option value="wild">wild</option>
-          <option value="dungeon">dungeon</option>
-          <option value="player">player</option>
-        </select>
-      </div>
-      <div>
-        <label>Size</label>
-        <input id="propSize" type="number" min="10" max="50" value="18">
-      </div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label>X</label>
-        <input id="propX" type="number">
-      </div>
-      <div>
-        <label>Y</label>
-        <input id="propY" type="number">
-      </div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label>Travel speed</label>
-        <input id="propSpeed" type="number" min="0" step="1" value="100">
-      </div>
-      <div>
-        <label>Region</label>
-        <input id="propRegion" type="text" placeholder="Optional">
-      </div>
-    </div>
-
-    <div class="row">
-      <button id="applyPropsBtn">Apply</button>
-      <button id="duplicateNodeBtn">Duplicate</button>
-    </div>
-
-    <hr>
-
-    <h3>SELECTION</h3>
-    <div id="selectionInfo" class="mini">No node selected.</div>
-
-    <hr>
-
-    <h3>STATS</h3>
-    <div id="statsInfo" class="mini"></div>
-  </div>
-
-  <div id="ioPanel" class="panel">
-    <textarea id="jsonBox" spellcheck="false"></textarea>
-  </div>
-
-  <div class="status" id="statusBox"></div>
-
-  <svg id="canvas" viewBox="0 0 3000 2000">
-    <g id="viewport">
-      <g id="gridLayer"></g>
-      <g id="connectionsLayer"></g>
-      <g id="nodesLayer"></g>
-    </g>
-  </svg>
 </div>
-
 <script>
 (function(){
-  const WORLD_W = 3000;
-  const WORLD_H = 2000;
+  const svg = document.getElementById("tree");
+  const viewport = document.getElementById("viewport");
+  const ringsLayer = document.getElementById("ringsLayer");
+  const connectionsLayer = document.getElementById("connectionsLayer");
+  const nodesLayer = document.getElementById("nodesLayer");
+  const tooltip = document.getElementById("tooltip");
+  const jsonBox = document.getElementById("jsonBox");
+  const allocatedCountEl = document.getElementById("allocatedCount");
+  const activeStartLabel = document.getElementById("activeStartLabel");
+  const statPanel = document.getElementById("statPanel");
+  const skillTreeMenu = document.getElementById("skillTreeMenu");
+  const openSkillTreeBtn = document.getElementById("openSkillTreeBtn");
+  const closeSkillTreeBtn = document.getElementById("closeSkillTreeBtn");
 
-  const svg = document.getElementById('canvas');
-  const viewport = document.getElementById('viewport');
-  const gridLayer = document.getElementById('gridLayer');
-  const connectionsLayer = document.getElementById('connectionsLayer');
-  const nodesLayer = document.getElementById('nodesLayer');
-  const jsonBox = document.getElementById('jsonBox');
-  const statusBox = document.getElementById('statusBox');
-  const selectionInfo = document.getElementById('selectionInfo');
-  const statsInfo = document.getElementById('statsInfo');
+  openSkillTreeBtn.addEventListener("click", () => {
+    skillTreeMenu.classList.remove("hidden");
+  });
 
-  const els = {
-    modeSelectBtn: document.getElementById('modeSelectBtn'),
-    modeAddBtn: document.getElementById('modeAddBtn'),
-    modeConnectBtn: document.getElementById('modeConnectBtn'),
-    modeDeleteLinkBtn: document.getElementById('modeDeleteLinkBtn'),
-    fitViewBtn: document.getElementById('fitViewBtn'),
-    resetViewBtn: document.getElementById('resetViewBtn'),
-    deleteNodeBtn: document.getElementById('deleteNodeBtn'),
-    exportBtn: document.getElementById('exportBtn'),
-    importBtn: document.getElementById('importBtn'),
-    newMapBtn: document.getElementById('newMapBtn'),
-    newType: document.getElementById('newType'),
-    newSize: document.getElementById('newSize'),
-    showGrid: document.getElementById('showGrid'),
-    snapToGrid: document.getElementById('snapToGrid'),
-    gridSize: document.getElementById('gridSize'),
-    propId: document.getElementById('propId'),
-    propName: document.getElementById('propName'),
-    propDesc: document.getElementById('propDesc'),
-    propType: document.getElementById('propType'),
-    propSize: document.getElementById('propSize'),
-    propX: document.getElementById('propX'),
-    propY: document.getElementById('propY'),
-    propSpeed: document.getElementById('propSpeed'),
-    propRegion: document.getElementById('propRegion'),
-    applyPropsBtn: document.getElementById('applyPropsBtn'),
-    duplicateNodeBtn: document.getElementById('duplicateNodeBtn')
-  };
+  closeSkillTreeBtn.addEventListener("click", () => {
+    skillTreeMenu.classList.add("hidden");
+  });
 
-  let mode = 'select';
-  let locations = [];
-  let connections = [];
-  let selectedNodeId = null;
-  let selectedConnectionIndex = null;
-  let connectStartId = null;
-  let panState = { dragging:false, startX:0, startY:0, originX:0, originY:0 };
-  let dragNodeId = null;
+
+  const CENTER = { x:800, y:500 };
+
+  let data = null;
+  let nodeMap = {};
+  let adjacency = {};
+  let chosenStartId = null;
+  let playerStats = {};
+  let spentPoints = 0;
+  let playerPoints = 1000000;
+
   const view = { x:0, y:0, scale:1 };
+  let dragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let originX = 0;
+  let originY = 0;
 
-  function nextNodeId(){
-    let max = 0;
-    for(const loc of locations){
-      const m = /^loc(\d+)$/.exec(loc.id || '');
-      if(m) max = Math.max(max, Number(m[1]));
-    }
-    return 'loc' + (max + 1);
-  }
 
-  function defaultMap(){
+
+   
+  function defaultData(){
     return {
-      locations: [
-        { id:'loc1', name:'Guild Hall', desc:'Main guild headquarters.', type:'city', x:1500, y:1000, size:18, speed:100, region:'Central' },
-        { id:'loc2', name:'Dark Forest', desc:'Dangerous woods full of contracts.', type:'wild', x:980, y:760, size:18, speed:90, region:'West' },
-        { id:'loc3', name:'Ancient Ruins', desc:'Broken stone halls and old secrets.', type:'dungeon', x:2160, y:700, size:18, speed:80, region:'East' }
+      attributes: [],
+      mainRings: [{id:"mr1", radius:120}],
+      subRings: [],
+      nodes: [
+        {
+          id:"n1",
+          name:"Start",
+          desc:"Origin",
+          type:"start",
+          size:18,
+          orbitType:"main",
+          mainRingId:"mr1",
+          subRingId:"",
+          angleDeg:-90,
+          radiusOffset:0,
+          x:800,
+          y:380,
+          bonuses:{}
+        }
       ],
-      connections: [['loc1','loc2'], ['loc1','loc3']]
+      connections: []
     };
   }
 
-  function loadMapData(map){
-    locations = Array.isArray(map.locations) ? map.locations.map(normalizeLocation) : [];
-    connections = Array.isArray(map.connections) ? map.connections.filter(isValidConnection).map(c => [c[0], c[1]]) : [];
-    ensureUniqueIds();
-    selectedNodeId = null;
-    selectedConnectionIndex = null;
-    connectStartId = null;
-    render();
-    exportJSON();
+
+  function nodeRadius(type){
+
+    switch(type){
+
+      case "start":
+        return 20;
+
+      case "keystone":
+        return 26;
+
+      case "notable":
+        return 18;
+
+      default:
+        return 14;
+    }
+
   }
 
-  function normalizeLocation(loc){
-    return {
-      id: String(loc.id || nextNodeId()),
-      name: String(loc.name || 'New Location'),
-      desc: String(loc.desc || ''),
-      type: ['city','wild','dungeon','player'].includes(loc.type) ? loc.type : 'wild',
-      x: Number(loc.x ?? 0),
-      y: Number(loc.y ?? 0),
-      size: Math.max(10, Number(loc.size ?? 18)),
-      speed: Math.max(0, Number(loc.speed ?? 100)),
-      region: String(loc.region || '')
-    };
+  function isPathNode(node){
+    return !!node.exclusiveGroup;
   }
 
-  function ensureUniqueIds(){
-    const seen = new Set();
-    for(const loc of locations){
-      let id = String(loc.id || nextNodeId());
-      while(seen.has(id)) id = nextNodeId();
-      if(id !== loc.id){
-        const oldId = loc.id;
-        loc.id = id;
-        for(const c of connections){
-          if(c[0] === oldId) c[0] = id;
-          if(c[1] === oldId) c[1] = id;
+  function isChoiceNode(node){
+
+    const neighbors = adjacency[node.id] || [];
+
+    const groups = new Set();
+
+    for(const nid of neighbors){
+      const n = nodeMap[nid];
+      if(n?.exclusiveGroup){
+        groups.add(n.exclusiveGroup);
+      }
+    }
+
+    return groups.size > 0;
+  }
+
+  function computeNodeDistances(){
+
+    const dist = {};
+    const queue = [];
+
+    for(const n of data.nodes){
+      if(n.allocated){
+        dist[n.id] = 0;
+        queue.push(n.id);
+      }
+    }
+
+    while(queue.length){
+      const cur = queue.shift();
+
+      for(const next of (adjacency[cur] || [])){
+        if(dist[next] === undefined){
+          dist[next] = dist[cur] + 1;
+          queue.push(next);
         }
       }
-      seen.add(loc.id);
     }
+
+    return dist;
   }
 
-  function isValidConnection(c){
-    return Array.isArray(c) && c.length === 2;
+  function computeStats(){
+
+    const totals = {};
+
+    if (!data.attributes) return totals;
+
+    for (const attr of data.attributes){
+      totals[attr.id] = 0;
+    }
+
+    for (const node of data.nodes){
+
+      if (!node.allocated) continue;
+      if (!node.bonuses) continue;
+
+      for (const key in node.bonuses){
+
+        if (!(key in totals)){
+          totals[key] = 0;
+        }
+
+        totals[key] += Number(node.bonuses[key]);
+      }
+
+    }
+    playerStats = totals;
+    return totals;
+  }
+
+  function renderStats(){
+
+    if (!data.attributes) return;
+
+    const stats = computeStats();
+
+    statPanel.innerHTML = "";
+
+    for (const attr of data.attributes){
+
+      const value = stats[attr.id] || 0;
+
+      const alwaysVisible = ["str","dex","int","hp"];
+
+      if (value < 1 && !alwaysVisible.includes(attr.id)){
+        continue;
+      }
+
+      const row = document.createElement("div");
+      row.className = "stat-row stat-" + attr.id;
+
+      const name = document.createElement("div");
+      name.className = "stat-name";
+
+      const icon = document.createElement("span");
+      icon.className = "stat-icon";
+
+      // simple icons
+      const icons = {
+        str:"*",
+        dex:"*",
+        int:"*",
+        hp:"❤"
+      };
+
+      icon.textContent = icons[attr.id] || "◆";
+
+      const label = document.createElement("span");
+      label.textContent = attr.name;
+
+      name.appendChild(icon);
+      name.appendChild(label);
+
+      const val = document.createElement("div");
+      val.className = "stat-value";
+      val.textContent = value;
+
+      row.appendChild(name);
+      row.appendChild(val);
+
+      statPanel.appendChild(row);
+    }
   }
 
   function createSvg(tag){
-    return document.createElementNS('http://www.w3.org/2000/svg', tag);
+    return document.createElementNS("http://www.w3.org/2000/svg", tag);
   }
 
-  function clamp(v, min, max){
-    return Math.max(min, Math.min(max, v));
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function getMainRing(id){
+    return data.mainRings.find(r => r.id === id) || null;
   }
 
-  function applyTransform(){
-    viewport.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.scale})`);
+  function getSubRing(id){
+    return data.subRings.find(r => r.id === id) || null;
   }
 
-  function screenToWorld(evt){
-    const rect = svg.getBoundingClientRect();
-    const sx = (evt.clientX - rect.left) * (WORLD_W / rect.width);
-    const sy = (evt.clientY - rect.top) * (WORLD_H / rect.height);
+  function getSubRingCenter(sub){
+    const parent = getMainRing(sub.parentMainRingId);
+    if (!parent) return { x:CENTER.x, y:CENTER.y };
+    const a = degToRad(sub.anchorAngleDeg);
     return {
-      x: (sx - view.x) / view.scale,
-      y: (sy - view.y) / view.scale
+      x: CENTER.x + Math.cos(a) * parent.radius,
+      y: CENTER.y + Math.sin(a) * parent.radius
     };
   }
 
-  function snapPoint(p){
-    if(!els.snapToGrid.checked) return p;
-    const step = Math.max(10, Number(els.gridSize.value || 100));
-    return {
-      x: Math.round(p.x / step) * step,
-      y: Math.round(p.y / step) * step
-    };
-  }
-
-  function getNode(id){
-    return locations.find(l => l.id === id) || null;
-  }
-
-  function getConnectionIndex(a, b){
-    return connections.findIndex(c =>
-      (c[0] === a && c[1] === b) ||
-      (c[0] === b && c[1] === a)
-    );
-  }
-
-  function setMode(next){
-    mode = next;
-    connectStartId = null;
-    els.modeSelectBtn.classList.toggle('activeMode', mode === 'select');
-    els.modeAddBtn.classList.toggle('activeMode', mode === 'add');
-    els.modeConnectBtn.classList.toggle('activeMode', mode === 'connect');
-    els.modeDeleteLinkBtn.classList.toggle('activeMode', mode === 'delete-link');
-    updateStatus();
-  }
-
-  function updateStatus(){
-    const selected = getNode(selectedNodeId);
-    const parts = [
-      `Mode: ${mode}`,
-      selected ? `Selected: ${selected.name} (${selected.id})` : 'Selected: none',
-      connectStartId ? `Link start: ${connectStartId}` : 'Link start: none'
-    ];
-    statusBox.textContent = parts.join(' • ');
-  }
-
-  function updateStats(){
-    const cityCount = locations.filter(l => l.type === 'city').length;
-    const wildCount = locations.filter(l => l.type === 'wild').length;
-    const dungeonCount = locations.filter(l => l.type === 'dungeon').length;
-    const playerCount = locations.filter(l => l.type === 'player').length;
-    statsInfo.innerHTML = `Nodes: ${locations.length}<br>Links: ${connections.length}<br>Cities: ${cityCount}<br>Wild: ${wildCount}<br>Dungeons: ${dungeonCount}<br>Player: ${playerCount}`;
-  }
-
-  function updatePropertiesPanel(){
-    const node = getNode(selectedNodeId);
-    if(!node){
-      els.propId.value = '';
-      els.propName.value = '';
-      els.propDesc.value = '';
-      els.propType.value = 'wild';
-      els.propSize.value = 18;
-      els.propX.value = '';
-      els.propY.value = '';
-      els.propSpeed.value = 100;
-      els.propRegion.value = '';
-      selectionInfo.textContent = 'No node selected.';
-      return;
+  function computeNodePosition(node){
+    if (node.orbitType === "free") {
+      return { x: node.x, y: node.y };
     }
-
-    els.propId.value = node.id;
-    els.propName.value = node.name;
-    els.propDesc.value = node.desc;
-    els.propType.value = node.type;
-    els.propSize.value = node.size;
-    els.propX.value = Math.round(node.x);
-    els.propY.value = Math.round(node.y);
-    els.propSpeed.value = node.speed;
-    els.propRegion.value = node.region;
-    selectionInfo.innerHTML = `${node.name}<br>${node.type}<br>${Math.round(node.x)}, ${Math.round(node.y)}`;
+    if (node.orbitType === "main") {
+      const ring = getMainRing(node.mainRingId);
+      if (!ring) return { x:CENTER.x, y:CENTER.y };
+      const r = ring.radius + Number(node.radiusOffset || 0);
+      const a = degToRad(node.angleDeg);
+      return { x: CENTER.x + Math.cos(a) * r, y: CENTER.y + Math.sin(a) * r };
+    }
+    if (node.orbitType === "sub") {
+      const sub = getSubRing(node.subRingId);
+      if (!sub) return { x:CENTER.x, y:CENTER.y };
+      const c = getSubRingCenter(sub);
+      const r = sub.radius + Number(node.radiusOffset || 0);
+      const a = degToRad(node.angleDeg);
+      return { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r };
+    }
+    return { x:CENTER.x, y:CENTER.y };
   }
 
-  function drawGrid(){
-    gridLayer.innerHTML = '';
-    if(!els.showGrid.checked) return;
-    const step = Math.max(10, Number(els.gridSize.value || 100));
-    for(let x = 0; x <= WORLD_W; x += step){
-      const line = createSvg('line');
-      line.setAttribute('class', 'grid-line');
-      line.setAttribute('x1', x);
-      line.setAttribute('y1', 0);
-      line.setAttribute('x2', x);
-      line.setAttribute('y2', WORLD_H);
-      gridLayer.appendChild(line);
-    }
-    for(let y = 0; y <= WORLD_H; y += step){
-      const line = createSvg('line');
-      line.setAttribute('class', 'grid-line');
-      line.setAttribute('x1', 0);
-      line.setAttribute('y1', y);
-      line.setAttribute('x2', WORLD_W);
-      line.setAttribute('y2', y);
-      gridLayer.appendChild(line);
+  function applyPositions(){
+    for (const node of data.nodes) {
+      if (node.orbitType !== "free") {
+        const p = computeNodePosition(node);
+        node.x = p.x;
+        node.y = p.y;
+      }
+      if (typeof node.allocated !== "boolean") {
+        node.allocated = false;
+      }
+
+      if (!node.bonuses) {
+        node.bonuses = {};
+      }
     }
   }
 
-  function drawConnections(){
-    connectionsLayer.innerHTML = '';
-    connections.forEach((c, index) => {
-      const a = getNode(c[0]);
-      const b = getNode(c[1]);
-      if(!a || !b) return;
-      const line = createSvg('line');
-      let cls = 'map-path';
-      if(index === selectedConnectionIndex) cls += ' selected';
-      line.setAttribute('class', cls);
-      line.setAttribute('x1', a.x);
-      line.setAttribute('y1', a.y);
-      line.setAttribute('x2', b.x);
-      line.setAttribute('y2', b.y);
-      line.addEventListener('click', (evt) => {
-        evt.stopPropagation();
-        selectedConnectionIndex = index;
-        if(mode === 'delete-link'){
-          connections.splice(index, 1);
-          selectedConnectionIndex = null;
+  function buildMaps(){
+    nodeMap = {};
+    adjacency = {};
+    for (const n of data.nodes) {
+      nodeMap[n.id] = n;
+      adjacency[n.id] = [];
+    }
+    for (const [a, b] of data.connections) {
+      if (adjacency[a]) adjacency[a].push(b);
+      if (adjacency[b]) adjacency[b].push(a);
+    }
+  }
+
+  function canAllocate(id){
+    const node = nodeMap[id];
+    if (!node) return false;
+
+    if (!chosenStartId) {
+      return node.type === "start" && id === chosenStartId;
+    }
+
+    if (node.allocated) return true;
+
+    return adjacency[id].some(nid => nodeMap[nid] && nodeMap[nid].allocated);
+  }
+
+  function refundBlocked(id){
+    const node = nodeMap[id];
+    if (!node || node.type === "start") return true;
+
+    const active = {};
+    for (const n of data.nodes) {
+      if (n.allocated && n.id !== id) active[n.id] = true;
+    }
+    if (data.activeStartId) active[data.activeStartId] = true;
+
+    const queue = [data.activeStartId];
+    const seen = {};
+    if (chosenStartId) seen[chosenStartId] = true;
+
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const next of (adjacency[cur] || [])) {
+        if (active[next] && !seen[next]) {
+          seen[next] = true;
+          queue.push(next);
         }
-        render();
-        exportJSON();
-      });
-      connectionsLayer.appendChild(line);
-    });
-  }
-
-  function drawNodes(){
-    nodesLayer.innerHTML = '';
-    locations.forEach((loc) => {
-      const g = createSvg('g');
-      let cls = `location ${loc.type}`;
-      if(loc.id === selectedNodeId) cls += ' selected';
-      g.setAttribute('class', cls);
-      g.dataset.nodeId = loc.id;
-
-      const outer = createSvg('circle');
-      outer.setAttribute('class', 'outer');
-      outer.setAttribute('cx', loc.x);
-      outer.setAttribute('cy', loc.y);
-      outer.setAttribute('r', loc.size + 5);
-
-      const core = createSvg('circle');
-      core.setAttribute('class', 'core');
-      core.setAttribute('cx', loc.x);
-      core.setAttribute('cy', loc.y);
-      core.setAttribute('r', loc.size);
-
-      const label = createSvg('text');
-      label.setAttribute('class', 'location-label');
-      label.setAttribute('x', loc.x);
-      label.setAttribute('y', loc.y + loc.size + 18);
-      label.textContent = loc.name || loc.id;
-
-      const sub = createSvg('text');
-      sub.setAttribute('class', 'subtext');
-      sub.setAttribute('x', loc.x);
-      sub.setAttribute('y', loc.y + loc.size + 31);
-      sub.textContent = loc.region || loc.type;
-
-      g.appendChild(outer);
-      g.appendChild(core);
-      g.appendChild(label);
-      g.appendChild(sub);
-      nodesLayer.appendChild(g);
-
-      g.addEventListener('mousedown', (evt) => {
-        evt.stopPropagation();
-
-        if(mode === 'select'){
-          selectedNodeId = loc.id;
-          selectedConnectionIndex = null;
-          dragNodeId = loc.id;
-          updatePropertiesPanel();
-          updateStatus();
-          render();
-          return;
-        }
-
-        if(mode === 'connect' || mode === 'delete-link'){
-          if(!connectStartId){
-            connectStartId = loc.id;
-          }else if(connectStartId !== loc.id){
-            const idx = getConnectionIndex(connectStartId, loc.id);
-            if(mode === 'connect'){
-              if(idx === -1) connections.push([connectStartId, loc.id]);
-              selectedConnectionIndex = idx === -1 ? connections.length - 1 : idx;
-            }else{
-              if(idx !== -1) connections.splice(idx, 1);
-              selectedConnectionIndex = null;
-            }
-            connectStartId = null;
-            exportJSON();
-            render();
-          }
-        }
-      });
-
-      g.addEventListener('click', (evt) => {
-        evt.stopPropagation();
-        if(mode === 'select'){
-          selectedNodeId = loc.id;
-          selectedConnectionIndex = null;
-          updatePropertiesPanel();
-          updateStatus();
-          render();
-        }
-      });
-    });
-  }
-
-  function render(){
-    applyTransform();
-    drawGrid();
-    drawConnections();
-    drawNodes();
-    updatePropertiesPanel();
-    updateStats();
-    updateStatus();
-  }
-
-  function addNode(point){
-    point = snapPoint(point);
-    const node = normalizeLocation({
-      id: nextNodeId(),
-      name: 'New Location',
-      desc: '',
-      type: els.newType.value,
-      x: clamp(point.x, 0, WORLD_W),
-      y: clamp(point.y, 0, WORLD_H),
-      size: Number(els.newSize.value || 18),
-      speed: 100,
-      region: ''
-    });
-    locations.push(node);
-    selectedNodeId = node.id;
-    selectedConnectionIndex = null;
-    exportJSON();
-    render();
-  }
-
-  function deleteSelectedNode(){
-    if(!selectedNodeId) return;
-    locations = locations.filter(l => l.id !== selectedNodeId);
-    connections = connections.filter(c => c[0] !== selectedNodeId && c[1] !== selectedNodeId);
-    selectedNodeId = null;
-    selectedConnectionIndex = null;
-    connectStartId = null;
-    exportJSON();
-    render();
-  }
-
-  function duplicateSelectedNode(){
-    const node = getNode(selectedNodeId);
-    if(!node) return;
-    const copy = normalizeLocation({ ...node, id: nextNodeId(), x: node.x + 60, y: node.y + 60, name: node.name + ' Copy' });
-    locations.push(copy);
-    selectedNodeId = copy.id;
-    exportJSON();
-    render();
-  }
-
-  function applySelectedProperties(){
-    const node = getNode(selectedNodeId);
-    if(!node) return;
-    node.name = els.propName.value.trim() || node.id;
-    node.desc = els.propDesc.value;
-    node.type = els.propType.value;
-    node.size = Math.max(10, Number(els.propSize.value || 18));
-    node.speed = Math.max(0, Number(els.propSpeed.value || 100));
-    node.region = els.propRegion.value.trim();
-    const p = snapPoint({
-      x: clamp(Number(els.propX.value || node.x), 0, WORLD_W),
-      y: clamp(Number(els.propY.value || node.y), 0, WORLD_H)
-    });
-    node.x = p.x;
-    node.y = p.y;
-    exportJSON();
-    render();
-  }
-
-  function exportJSON(){
-    ensureUniqueIds();
-    jsonBox.value = JSON.stringify({ locations, connections }, null, 2);
-  }
-
-  function importJSON(){
-    try{
-      const parsed = JSON.parse(jsonBox.value);
-      loadMapData(parsed);
-    }catch(err){
-      alert('Invalid JSON');
-    }
-  }
-
-  function fitView(){
-    if(!locations.length){
-      view.x = 0;
-      view.y = 0;
-      view.scale = 1;
-      render();
-      return;
-    }
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for(const loc of locations){
-      minX = Math.min(minX, loc.x - loc.size - 30);
-      minY = Math.min(minY, loc.y - loc.size - 30);
-      maxX = Math.max(maxX, loc.x + loc.size + 30);
-      maxY = Math.max(maxY, loc.y + loc.size + 45);
-    }
-    const width = Math.max(200, maxX - minX);
-    const height = Math.max(200, maxY - minY);
-    const scaleX = WORLD_W / width;
-    const scaleY = WORLD_H / height;
-    view.scale = clamp(Math.min(scaleX, scaleY) * 0.82, 0.2, 3.5);
-    view.x = -minX * view.scale + (WORLD_W - width * view.scale) / 2;
-    view.y = -minY * view.scale + (WORLD_H - height * view.scale) / 2;
-    render();
-  }
-
-  svg.addEventListener('mousedown', (evt) => {
-    const point = screenToWorld(evt);
-
-    if(mode === 'add' && !evt.target.closest('.location')){
-      addNode(point);
-      return;
+      }
     }
 
-    if(!evt.target.closest('.location')){
-      selectedConnectionIndex = null;
-      if(mode === 'select') selectedNodeId = null;
-      panState.dragging = true;
-      svg.classList.add('dragging');
-      panState.startX = evt.clientX;
-      panState.startY = evt.clientY;
-      panState.originX = view.x;
-      panState.originY = view.y;
-      render();
+    for (const key in active) {
+      if (!seen[key]) return true;
     }
-  });
+    return false;
+  }
 
-  window.addEventListener('mousemove', (evt) => {
-    if(dragNodeId){
-      const node = getNode(dragNodeId);
-      if(node){
-        const p = snapPoint(screenToWorld(evt));
-        node.x = clamp(p.x, 0, WORLD_W);
-        node.y = clamp(p.y, 0, WORLD_H);
-        render();
+  function toggleNode(id){
+    const node = nodeMap[id];
+    if (!node) return;
+
+    if (node.type === "start") {
+      if (!chosenStartId) {
+        chosenStartId = id;
+
+        for (const n of data.nodes) n.allocated = false;
+        node.allocated = true;
+
+        renderState();
       }
       return;
     }
 
-    if(panState.dragging){
-      const rect = svg.getBoundingClientRect();
-      const dx = (evt.clientX - panState.startX) * (WORLD_W / rect.width);
-      const dy = (evt.clientY - panState.startY) * (WORLD_H / rect.height);
-      view.x = panState.originX + dx;
-      view.y = panState.originY + dy;
-      applyTransform();
+    if (!node.allocated) {
+
+      if (!canAllocate(id)) return;
+
+      if (exclusiveBlocked(node)) return;
+
+      if (!requirementsMet(node)) return;
+
+      const cost = node.requirements?.points || 0;
+
+      spentPoints += cost;
+      node.allocated = true;
+    } else {
+
+      const cost = node.requirements?.points || 0;
+
+      if (refundBlocked(id)) return;
+
+      spentPoints -= cost;
+      node.allocated = false;
+    }
+
+    renderState();
+  }
+
+  function renderRings(){
+    ringsLayer.innerHTML = "";
+    for (const ring of data.mainRings) {
+      const c = createSvg("circle");
+      c.setAttribute("class", "main-ring");
+      c.setAttribute("cx", CENTER.x);
+      c.setAttribute("cy", CENTER.y);
+      c.setAttribute("r", ring.radius);
+      ringsLayer.appendChild(c);
+    }
+    for (const sub of data.subRings) {
+      const cpos = getSubRingCenter(sub);
+      const c = createSvg("circle");
+      c.setAttribute("class", "sub-ring");
+      c.setAttribute("cx", cpos.x);
+      c.setAttribute("cy", cpos.y);
+      c.setAttribute("r", sub.radius);
+      ringsLayer.appendChild(c);
+    }
+  }
+
+  function renderConnections(){
+
+  connectionsLayer.innerHTML = "";
+
+  for (const [aId, bId] of data.connections){
+
+      const a = nodeMap[aId];
+      const b = nodeMap[bId];
+
+      if (!a || !b) continue;
+
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx*dx + dy*dy);
+
+      const nx = dx / len;
+      const ny = dy / len;
+
+      const ar = Number(a.size || 14) + 5;
+      const br = Number(b.size || 14) + 5;
+
+      const x1 = a.x + nx * ar;
+      const y1 = a.y + ny * ar;
+
+      const x2 = b.x - nx * br;
+      const y2 = b.y - ny * br;
+
+      const line = createSvg("line");
+
+      line.setAttribute("class", "connection");
+
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+
+      line.dataset.a = aId;
+      line.dataset.b = bId;
+
+      connectionsLayer.appendChild(line);
+    }
+  }
+
+  function renderNodes(){
+
+    const distances = computeNodeDistances();   // <-- add this
+
+    nodesLayer.innerHTML = "";
+
+    for (const node of data.nodes) {
+
+      const g = createSvg("g");
+
+      let cls = "node";
+      
+      g.__nodeId = node.id;
+      
+      if (!requirementsMet(node) && !node.allocated){
+        cls += " disabled";
+      }
+
+      if(isPathNode(node)){
+        cls += " path";
+      }
+
+      if (node.allocated) cls += " active";
+
+      if (node.type === "start") {
+        cls += " start";
+        if (!chosenStartId) cls += " selectable";
+      }
+
+      g.setAttribute("class", cls);
+
+      // ----- OPACITY RULE -----
+      if (nodeIsDim(node, distances)){
+        g.style.opacity = 0.25;
+      }else{
+        g.style.opacity = 1;
+      }
+      // ------------------------
+
+      const r = nodeRadius(node.type);
+
+      const outer = createSvg("circle");
+      outer.setAttribute("class", "outer");
+      outer.setAttribute("cx", node.x);
+      outer.setAttribute("cy", node.y);
+      outer.setAttribute("r", r + 5);
+
+      const core = createSvg("circle");
+      core.setAttribute("class", "core");
+      core.setAttribute("cx", node.x);
+      core.setAttribute("cy", node.y);
+      core.setAttribute("r", r);
+
+      g.appendChild(outer);
+      g.appendChild(core);
+      nodesLayer.appendChild(g);
+
+      g.addEventListener("mouseenter", e=>{
+        showTooltip(e,node);
+        highlightExclusiveGroup(node.exclusiveGroup);
+      });
+      g.addEventListener("mousemove", moveTooltip);
+      g.addEventListener("mouseleave", ()=>{
+        hideTooltip();
+        clearExclusiveHighlight();
+      });
+
+      g.addEventListener("click", function(evt){
+        evt.stopPropagation();
+        toggleNode(node.id);
+      });
+    }
+  }
+
+  function highlightExclusiveGroup(group){
+
+    if(!group) return;
+
+    document.querySelectorAll(".node").forEach(el=>{
+      const id = el.__nodeId;
+      const n = nodeMap[id];
+
+      if(n?.exclusiveGroup === group){
+        el.classList.add("highlight");
+      }
+    });
+  }
+
+  function clearExclusiveHighlight(){
+    document.querySelectorAll(".node.highlight").forEach(el=>{
+      el.classList.remove("highlight");
+    });
+  }
+
+  function exclusiveBlocked(node){
+
+    if(!node.exclusiveGroup) return false;
+
+    for(const n of data.nodes){
+
+      if(n.id === node.id) continue;
+
+      if(n.exclusiveGroup === node.exclusiveGroup && n.allocated){
+        return true;
+      }
+
+    }
+
+    return false;
+  }
+
+  function nodeIsDim(node, distances){
+    const exclusiveFail = exclusiveBlocked(node);
+    const d = distances[node.id];
+
+    const tooFar = (d === undefined || d > 1);
+    const reqFail = !requirementsMet(node) && !node.allocated;
+
+    return tooFar || reqFail || exclusiveFail;
+  }
+
+  function requirementsMet(node){
+
+    if(!node.requirements) return true;
+
+    const req=node.requirements;
+
+    if(req.points){
+      const remaining = playerPoints - spentPoints;
+      if(remaining < req.points) return false;
+    }
+
+    if(req.attributes){
+      for(const attr in req.attributes){
+
+        const need=req.attributes[attr];
+        const have=playerStats[attr] || 0;
+
+        if(have < need) return false;
+      }
+    }
+
+    return true;
+  }
+
+  function renderState(){
+
+    computeStats();   // important: refresh requirements first
+
+    const distances = computeNodeDistances();
+
+    document.querySelectorAll(".connection").forEach(line => {
+
+      const a = nodeMap[line.dataset.a];
+      const b = nodeMap[line.dataset.b];
+
+      line.classList.toggle("active", !!(a && b && a.allocated && b.allocated));
+
+      const dimA = nodeIsDim(a, distances);
+      const dimB = nodeIsDim(b, distances);
+
+      if (dimA || dimB){
+        line.style.opacity = 0.2;
+      }else{
+        line.style.opacity = 1;
+      }
+
+    });
+
+    allocatedCountEl.textContent = playerPoints - spentPoints;
+
+    const start = nodeMap[chosenStartId];
+    activeStartLabel.textContent = start ? (start.name || start.id) : "";
+    
+    renderStats();
+    renderNodes();
+  }
+
+  function renderAll(){
+    applyPositions();
+    buildMaps();
+    renderRings();
+    renderConnections();
+    renderState();
+  }
+
+  function decodeRingIds(){
+
+    if (!data || !data.nodes) return;
+
+    for (const node of data.nodes){
+
+      if (!node.ringId) continue;
+
+      const parts = node.ringId.split(":");
+
+      const type = parts[0] || "free";
+      const main = parts[1] || "";
+      const sub  = parts[2] || "";
+
+      node.orbitType = type;
+
+      node.mainRingId = (main === "none") ? "" : main;
+      node.subRingId  = (sub === "none") ? "" : sub;
+
+    }
+  }
+
+  function loadJSON(){
+    try {
+
+      const parsed = JSON.parse(jsonBox.value);
+      data = parsed;
+
+      decodeRingIds();   // <-- NEW
+
+      chosenStartId = null;
+
+      for (const n of data.nodes) {
+        n.allocated = false;
+      }
+
+      renderAll();
+
+    } catch(e) {
+      alert("Invalid JSON");
+    }
+  }
+
+  function nodeExists(id){
+    return data.nodes.some(n => n.id === id);
+  }
+
+  function refundAll(){
+    chosenStartId = null;
+
+    for (const n of data.nodes) {
+      n.allocated = false;
+    }
+    renderState();
+  }
+
+  function applyTransform(){
+    viewport.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.scale})`);
+  }
+
+  function showTooltip(event, node){
+
+    tooltip.querySelector(".name").textContent = node.name || node.id;
+    tooltip.querySelector(".type").textContent = node.type || "node";
+
+    const descBox = tooltip.querySelector(".desc");
+    const bonusesBox = tooltip.querySelector(".bonuses");
+    const reqBox = tooltip.querySelector(".requirements");
+
+    descBox.textContent = node.desc || "";
+    bonusesBox.innerHTML = "";
+    reqBox.innerHTML = "";
+
+    // ---- BONUSES ----
+    if (node.bonuses){
+
+      for (const k in node.bonuses){
+
+        const v = Number(node.bonuses[k]);
+
+        const row = document.createElement("div");
+        row.className = "bonus-line";
+
+        row.textContent = (v >= 0 ? "+" + v : v) + " " + k.toUpperCase();
+
+        bonusesBox.appendChild(row);
+      }
+    }
+
+    // ---- REQUIREMENTS ----
+    if (node.requirements){
+
+      const stats = playerStats || {};
+
+      // skill point requirement
+      if (node.requirements.points){
+
+        const need = node.requirements.points;
+        const have = playerPoints - spentPoints;
+
+        const row = document.createElement("div");
+        row.className = "req-line";
+
+        const met = have >= need;
+
+        row.textContent =
+          (met ? "✓ " : "✗ ") +
+          "Requires " + need + " skill points";
+
+        if (!met){
+          row.style.color = "#ff5c5c";
+          row.style.fontWeight = "bold";
+        }
+
+        reqBox.appendChild(row);
+      }
+
+      // attribute requirements
+      if (node.requirements.attributes){
+
+        for (const attr in node.requirements.attributes){
+
+          const need = node.requirements.attributes[attr];
+          const have = stats[attr] || 0;
+
+          const row = document.createElement("div");
+          row.className = "req-line";
+
+          const met = have >= need;
+
+          row.textContent =
+            (met ? "✓ " : "✗ ") +
+            "Requires " + need + " " + attr.toUpperCase();
+
+          if (!met){
+            row.style.color = "#ff5c5c";
+            row.style.fontWeight = "bold";
+          }
+
+          reqBox.appendChild(row);
+        }
+      }
+    }
+
+    tooltip.classList.add("visible");
+    moveTooltip(event);
+  }
+
+  function moveTooltip(event){
+    tooltip.style.left = (event.clientX + 14) + "px";
+    tooltip.style.top = (event.clientY + 14) + "px";
+  }
+
+  function hideTooltip(){
+    tooltip.classList.remove("visible");
+  }
+
+  document.getElementById("loadBtn").addEventListener("click", loadJSON);
+  document.getElementById("refundBtn").addEventListener("click", refundAll);
+  document.getElementById("resetViewBtn").addEventListener("click", function(){
+    view.x = 0;
+    view.y = 0;
+    view.scale = 1;
+    applyTransform();
+  });
+
+  svg.addEventListener("mousedown", function(evt){
+    dragging = true;
+    svg.classList.add("dragging");
+    dragStartX = evt.clientX;
+    dragStartY = evt.clientY;
+    originX = view.x;
+    originY = view.y;
+  });
+
+
+
+
+
+  
+  window.addEventListener("mousemove", function(evt){
+    if (!dragging) return;
+    const rect = svg.getBoundingClientRect();
+    const dx = (evt.clientX - dragStartX) * (1600 / rect.width);
+    const dy = (evt.clientY - dragStartY) * (1000 / rect.height);
+    view.x = originX + dx;
+    view.y = originY + dy;
+    applyTransform();
+  });
+
+  window.addEventListener("mouseup", function(){
+    dragging = false;
+    svg.classList.remove("dragging");
+  });
+
+
+  skillTreeMenu.addEventListener("click", (e) => {
+
+    const windowEl = document.querySelector(".skilltree-window");
+
+    // if click was outside the menu window
+    if (!windowEl.contains(e.target)) {
+      skillTreeMenu.classList.add("hidden");
+    }
+
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      skillTreeMenu.classList.add("hidden");
     }
   });
 
-  window.addEventListener('mouseup', () => {
-    dragNodeId = null;
-    panState.dragging = false;
-    svg.classList.remove('dragging');
-    exportJSON();
-  });
+  svg.addEventListener("wheel", function(e){
+    e.preventDefault();
 
-  svg.addEventListener('wheel', (evt) => {
-    evt.preventDefault();
     const rect = svg.getBoundingClientRect();
-    const mouseX = (evt.clientX - rect.left) * (WORLD_W / rect.width);
-    const mouseY = (evt.clientY - rect.top) * (WORLD_H / rect.height);
+    const mouseX = (e.clientX - rect.left) * (1600 / rect.width);
+    const mouseY = (e.clientY - rect.top) * (1000 / rect.height);
+
     const worldX = (mouseX - view.x) / view.scale;
     const worldY = (mouseY - view.y) / view.scale;
 
-    if(evt.deltaY < 0) view.scale *= 1.1;
+    if (e.deltaY < 0) view.scale *= 1.1;
     else view.scale *= 0.9;
-    view.scale = clamp(view.scale, 0.2, 4.0);
+
+    if (view.scale < 0.35) view.scale = 0.35;
+    if (view.scale > 3.0) view.scale = 3.0;
 
     view.x = mouseX - worldX * view.scale;
     view.y = mouseY - worldY * view.scale;
-    render();
+
+    applyTransform();
   }, { passive:false });
 
-  els.modeSelectBtn.addEventListener('click', () => setMode('select'));
-  els.modeAddBtn.addEventListener('click', () => setMode('add'));
-  els.modeConnectBtn.addEventListener('click', () => setMode('connect'));
-  els.modeDeleteLinkBtn.addEventListener('click', () => setMode('delete-link'));
-  els.resetViewBtn.addEventListener('click', () => {
-    view.x = 0; view.y = 0; view.scale = 1; render();
-  });
-  els.fitViewBtn.addEventListener('click', fitView);
-  els.deleteNodeBtn.addEventListener('click', deleteSelectedNode);
-  els.exportBtn.addEventListener('click', exportJSON);
-  els.importBtn.addEventListener('click', importJSON);
-  els.newMapBtn.addEventListener('click', () => loadMapData({ locations:[], connections:[] }));
-  els.applyPropsBtn.addEventListener('click', applySelectedProperties);
-  els.duplicateNodeBtn.addEventListener('click', duplicateSelectedNode);
-  els.showGrid.addEventListener('change', render);
-  els.snapToGrid.addEventListener('change', render);
-  els.gridSize.addEventListener('change', render);
-
-  loadMapData(defaultMap());
-  setMode('select');
-  fitView();
+  data = defaultData();
+  jsonBox.value = JSON.stringify(data, null, 2);
+  renderAll();
 })();
 </script>
 </body>

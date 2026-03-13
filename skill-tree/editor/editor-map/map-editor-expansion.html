@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Map Editor - Expansion</title>
+<style>
+  :root{
+    --bg1:#090b11;
+    --bg2:#111624;
+    --panel:rgba(10,14,20,0.94);
+    --panel-border:rgba(255,215,140,0.12);
+    --text:#e8dcc0;
+    --muted:#a89b82;
+    --line:rgba(150,140,120,0.24);
+    --line-strong:rgba(255,196,92,0.8);
+    --node-fill:#1c2433;
+    --node-stroke:#8b7550;
+    --node-selected:#fff0c6;
+    --city:#5f92ff;
+    --wild:#56745b;
+    --dungeon:#a34f4f;
+    --quest:#ffe9a6;
+    --danger:#ff8a8a;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    color:var(--text);
+    font-family:Arial, Helvetica, sans-serif;
+    background:
+      radial-gradient(circle at center, rgba(255,190,80,0.05) 0%, transparent 18%),
+      radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
+  }
+
+  #app{ width:100%; height:100%; position:relative; }
+
+  .panel{
+    position:absolute;
+    z-index:10;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.35);
+    backdrop-filter:blur(6px);
+  }
+
+  #toolbar{ top:10px; left:10px; width:420px; max-height:calc(100vh - 20px); overflow:auto; }
+  #properties{ top:10px; right:10px; width:360px; max-height:calc(100vh - 20px); overflow:auto; }
+  #ioPanel{ left:10px; bottom:10px; width:620px; height:230px; }
+  #questPanel{ right:380px; top:10px; width:330px; max-height:calc(100vh - 20px); overflow:auto; }
+
+  h3{ margin:0 0 8px 0; font-size:14px; letter-spacing:0.08em; }
+  .row{ display:flex; gap:8px; margin-bottom:8px; align-items:end; }
+  .row > *{ flex:1; }
+  .stack{ display:flex; flex-direction:column; gap:8px; }
+  label{ display:block; margin:0 0 4px 0; font-size:12px; color:var(--muted); }
+  input, select, textarea, button{
+    width:100%;
+    background:linear-gradient(180deg, #1b2331, #101620);
+    color:var(--text);
+    border:1px solid rgba(255,215,140,0.16);
+    border-radius:8px;
+    padding:8px 10px;
+    outline:none;
+  }
+  textarea{ min-height:72px; resize:vertical; }
+  button{ cursor:pointer; font-weight:bold; }
+  button:hover{ filter:brightness(1.08); }
+  .activeMode{ outline:2px solid rgba(255,240,198,0.7); }
+  .mini{ color:var(--muted); font-size:12px; line-height:1.35; }
+  hr{ border:none; border-top:1px solid rgba(255,215,140,0.08); margin:10px 0; }
+  .tag{
+    display:inline-block;
+    font-size:11px;
+    padding:3px 6px;
+    border-radius:999px;
+    border:1px solid rgba(255,215,140,0.14);
+    background:rgba(255,255,255,0.03);
+    margin:0 4px 4px 0;
+  }
+  .list-box{
+    border:1px solid rgba(255,215,140,0.12);
+    border-radius:10px;
+    padding:8px;
+    background:#0b0f16;
+    min-height:48px;
+  }
+  .entry{
+    border:1px solid rgba(255,215,140,0.1);
+    border-radius:8px;
+    padding:8px;
+    background:rgba(255,255,255,0.02);
+    margin-bottom:8px;
+  }
+  .entry:last-child{ margin-bottom:0; }
+  .entry-title{ font-weight:bold; color:#ffe7af; margin-bottom:4px; }
+  .entry-sub{ font-size:12px; color:var(--muted); }
+  .danger{ color:var(--danger); }
+
+  svg{ width:100%; height:100%; display:block; cursor:grab; user-select:none; }
+  svg.dragging{ cursor:grabbing; }
+  .grid-line{ stroke:rgba(255,255,255,0.04); stroke-width:1; }
+  .connection{ stroke:var(--line); stroke-width:4; stroke-linecap:round; }
+  .connection.selected{ stroke:var(--line-strong); stroke-width:5; }
+  .trade-route{ stroke:#7cc0ff; stroke-width:3; stroke-linecap:round; stroke-dasharray:10 8; opacity:0.85; }
+  .trade-route.selected{ stroke:#d4f0ff; stroke-width:4; }
+  .location{ cursor:pointer; }
+  .location .outer{ fill:rgba(10,12,18,0.95); stroke:rgba(255,213,129,0.18); stroke-width:2; }
+  .location .core{ fill:var(--node-fill); stroke:var(--node-stroke); stroke-width:2; }
+  .location.selected .core{ stroke:var(--node-selected); stroke-width:3; }
+  .location.city .core{ fill:#1d2f52; stroke:var(--city); }
+  .location.wild .core{ fill:#1f3022; stroke:var(--wild); }
+  .location.dungeon .core{ fill:#351d20; stroke:var(--dungeon); }
+  .location-label{ fill:#d9ceb6; font-size:12px; text-anchor:middle; pointer-events:none; }
+  .player-marker{ fill:#7dffae; stroke:#e7ffef; stroke-width:2; }
+  .quest-marker{ fill:#403200; stroke:var(--quest); stroke-width:2; }
+  .route-label{ fill:#b9ddff; font-size:11px; text-anchor:middle; pointer-events:none; }
+  #jsonBox{ width:100%; height:100%; background:#0b0f16; color:var(--text); font-family:Consolas, monospace; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar" class="panel">
+    <h3>WORLD EDITOR</h3>
+    <div class="row">
+      <button id="modeSelectBtn">Select</button>
+      <button id="modeAddBtn">Add Node</button>
+      <button id="modeConnectBtn">Connect</button>
+      <button id="modeTradeBtn">Trade Route</button>
+      <button id="modeDeleteLinkBtn">Delete Link</button>
+    </div>
+    <div class="row">
+      <button id="fitViewBtn">Fit View</button>
+      <button id="resetViewBtn">Reset View</button>
+      <button id="duplicateNodeBtn">Duplicate</button>
+      <button id="deleteNodeBtn">Delete Node</button>
+    </div>
+
+    <hr>
+    <h3>ADD LOCATION</h3>
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select id="addType">
+          <option value="city">City</option>
+          <option value="wild">Wild</option>
+          <option value="dungeon">Dungeon</option>
+        </select>
+      </div>
+      <div>
+        <label>Region</label>
+        <input id="addRegion" value="Frontier" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Size</label>
+        <input id="addSize" type="number" value="18" />
+      </div>
+      <div>
+        <label>Travel speed mod</label>
+        <input id="addSpeedMod" type="number" step="0.1" value="1" />
+      </div>
+    </div>
+
+    <hr>
+    <h3>DEFINITIONS</h3>
+    <div class="row">
+      <input id="newResourceId" placeholder="resource id" />
+      <input id="newResourceName" placeholder="Resource name" />
+      <button id="addResourceTypeBtn">Add Resource</button>
+    </div>
+    <div class="row">
+      <input id="newGoodsId" placeholder="goods id" />
+      <input id="newGoodsName" placeholder="Goods name" />
+      <button id="addGoodsTypeBtn">Add Goods</button>
+    </div>
+    <div class="row">
+      <input id="newGuildId" placeholder="guild id" />
+      <input id="newGuildName" placeholder="Guild name" />
+      <button id="addGuildTypeBtn">Add Guild</button>
+    </div>
+    <div class="row">
+      <input id="newEnemyId" placeholder="enemy id" />
+      <input id="newEnemyName" placeholder="Enemy name" />
+      <button id="addEnemyTypeBtn">Add Enemy</button>
+    </div>
+
+    <div class="mini">Wilds and dungeons now support enemy tables. Quest generation pulls from guilds, location types, enemies, resources, and goods.</div>
+
+    <hr>
+    <h3>DISPLAY</h3>
+    <div class="row">
+      <div>
+        <label><input id="snapEnabled" type="checkbox" checked style="width:auto; margin-right:6px;">Enable grid snap</label>
+      </div>
+      <div>
+        <label>Grid size</label>
+        <input id="gridSize" type="number" value="50" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label><input id="showGrid" type="checkbox" checked style="width:auto; margin-right:6px;">Show grid</label>
+      </div>
+      <div>
+        <label>Base travel speed</label>
+        <input id="baseTravelSpeed" type="number" value="120" />
+      </div>
+    </div>
+
+    <hr>
+    <div class="row">
+      <button id="exportBtn">Export JSON</button>
+      <button id="importBtn">Import JSON</button>
+    </div>
+  </div>
+
+  <div id="properties" class="panel">
+    <h3>LOCATION PROPERTIES</h3>
+    <label>ID</label>
+    <input id="propId" type="text" disabled />
+    <label>Name</label>
+    <input id="propName" type="text" placeholder="Location name" />
+    <label>Description</label>
+    <textarea id="propDesc" placeholder="Description"></textarea>
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select id="propType">
+          <option value="city">City</option>
+          <option value="wild">Wild</option>
+          <option value="dungeon">Dungeon</option>
+        </select>
+      </div>
+      <div>
+        <label>Region</label>
+        <input id="propRegion" type="text" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>X</label>
+        <input id="propX" type="number" />
+      </div>
+      <div>
+        <label>Y</label>
+        <input id="propY" type="number" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Size</label>
+        <input id="propSize" type="number" value="18" />
+      </div>
+      <div>
+        <label>Travel speed mod</label>
+        <input id="propSpeedMod" type="number" step="0.1" value="1" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Danger</label>
+        <input id="propDanger" type="number" min="0" max="10" value="1" />
+      </div>
+      <div>
+        <label>Guild</label>
+        <select id="propGuild"></select>
+      </div>
+    </div>
+    <button id="applyPropsBtn">Apply</button>
+
+    <hr>
+    <h3>RESOURCES</h3>
+    <div id="resourceList" class="list-box"></div>
+    <div class="row">
+      <select id="resourceSelect"></select>
+      <input id="resourceAmount" type="number" value="10" />
+      <button id="addResourceBtn">Add</button>
+    </div>
+
+    <hr>
+    <h3>MANUFACTURED GOODS</h3>
+    <div id="goodsList" class="list-box"></div>
+    <div class="row">
+      <select id="goodsSelect"></select>
+      <input id="goodsAmount" type="number" value="10" />
+      <button id="addGoodsBtn">Add</button>
+    </div>
+
+    <hr>
+    <h3>ENEMIES</h3>
+    <div id="enemyList" class="list-box"></div>
+    <div class="row">
+      <select id="enemySelect"></select>
+      <input id="enemyWeight" type="number" value="1" />
+      <button id="addEnemyBtn">Add</button>
+    </div>
+    <div class="mini">Enemy tables matter mostly for wilds and dungeons. Cities can have patrols, but that’s your funeral.</div>
+  </div>
+
+  <div id="questPanel" class="panel">
+    <h3>QUEST GENERATION</h3>
+    <div class="row">
+      <div>
+        <label>Quest count</label>
+        <input id="questCount" type="number" value="5" min="1" max="20" />
+      </div>
+      <div>
+        <label>Difficulty bias</label>
+        <select id="questDifficultyBias">
+          <option value="mixed">Mixed</option>
+          <option value="easy">Easy</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <button id="generateQuestsBtn">Generate Quests</button>
+      <button id="clearQuestsBtn">Clear</button>
+    </div>
+    <div id="questList" class="stack"></div>
+  </div>
+
+  <div id="ioPanel" class="panel">
+    <textarea id="jsonBox" spellcheck="false"></textarea>
+  </div>
+
+  <svg id="canvas" viewBox="0 0 3000 2000">
+    <g id="viewport">
+      <g id="gridLayer"></g>
+      <g id="connectionsLayer"></g>
+      <g id="tradeRoutesLayer"></g>
+      <g id="locationsLayer"></g>
+      <g id="overlayLayer"></g>
+    </g>
+  </svg>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('canvas');
+  const viewport = document.getElementById('viewport');
+  const gridLayer = document.getElementById('gridLayer');
+  const connectionsLayer = document.getElementById('connectionsLayer');
+  const tradeRoutesLayer = document.getElementById('tradeRoutesLayer');
+  const locationsLayer = document.getElementById('locationsLayer');
+  const overlayLayer = document.getElementById('overlayLayer');
+  const jsonBox = document.getElementById('jsonBox');
+
+  const els = {
+    modeSelectBtn: document.getElementById('modeSelectBtn'),
+    modeAddBtn: document.getElementById('modeAddBtn'),
+    modeConnectBtn: document.getElementById('modeConnectBtn'),
+    modeTradeBtn: document.getElementById('modeTradeBtn'),
+    modeDeleteLinkBtn: document.getElementById('modeDeleteLinkBtn'),
+    fitViewBtn: document.getElementById('fitViewBtn'),
+    resetViewBtn: document.getElementById('resetViewBtn'),
+    duplicateNodeBtn: document.getElementById('duplicateNodeBtn'),
+    deleteNodeBtn: document.getElementById('deleteNodeBtn'),
+    addType: document.getElementById('addType'),
+    addRegion: document.getElementById('addRegion'),
+    addSize: document.getElementById('addSize'),
+    addSpeedMod: document.getElementById('addSpeedMod'),
+    newResourceId: document.getElementById('newResourceId'),
+    newResourceName: document.getElementById('newResourceName'),
+    addResourceTypeBtn: document.getElementById('addResourceTypeBtn'),
+    newGoodsId: document.getElementById('newGoodsId'),
+    newGoodsName: document.getElementById('newGoodsName'),
+    addGoodsTypeBtn: document.getElementById('addGoodsTypeBtn'),
+    newGuildId: document.getElementById('newGuildId'),
+    newGuildName: document.getElementById('newGuildName'),
+    addGuildTypeBtn: document.getElementById('addGuildTypeBtn'),
+    newEnemyId: document.getElementById('newEnemyId'),
+    newEnemyName: document.getElementById('newEnemyName'),
+    addEnemyTypeBtn: document.getElementById('addEnemyTypeBtn'),
+    snapEnabled: document.getElementById('snapEnabled'),
+    gridSize: document.getElementById('gridSize'),
+    showGrid: document.getElementById('showGrid'),
+    baseTravelSpeed: document.getElementById('baseTravelSpeed'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    propId: document.getElementById('propId'),
+    propName: document.getElementById('propName'),
+    propDesc: document.getElementById('propDesc'),
+    propType: document.getElementById('propType'),
+    propRegion: document.getElementById('propRegion'),
+    propX: document.getElementById('propX'),
+    propY: document.getElementById('propY'),
+    propSize: document.getElementById('propSize'),
+    propSpeedMod: document.getElementById('propSpeedMod'),
+    propDanger: document.getElementById('propDanger'),
+    propGuild: document.getElementById('propGuild'),
+    applyPropsBtn: document.getElementById('applyPropsBtn'),
+    resourceList: document.getElementById('resourceList'),
+    resourceSelect: document.getElementById('resourceSelect'),
+    resourceAmount: document.getElementById('resourceAmount'),
+    addResourceBtn: document.getElementById('addResourceBtn'),
+    goodsList: document.getElementById('goodsList'),
+    goodsSelect: document.getElementById('goodsSelect'),
+    goodsAmount: document.getElementById('goodsAmount'),
+    addGoodsBtn: document.getElementById('addGoodsBtn'),
+    enemyList: document.getElementById('enemyList'),
+    enemySelect: document.getElementById('enemySelect'),
+    enemyWeight: document.getElementById('enemyWeight'),
+    addEnemyBtn: document.getElementById('addEnemyBtn'),
+    questCount: document.getElementById('questCount'),
+    questDifficultyBias: document.getElementById('questDifficultyBias'),
+    generateQuestsBtn: document.getElementById('generateQuestsBtn'),
+    clearQuestsBtn: document.getElementById('clearQuestsBtn'),
+    questList: document.getElementById('questList')
+  };
+
+  const WORLD_W = 3000;
+  const WORLD_H = 2000;
+
+  let mode = 'select';
+  let selectedLocationId = null;
+  let selectedConnection = null;
+  let selectedTradeRouteId = null;
+  let pendingLinkStart = null;
+  let dragState = null;
+  let quests = [];
+
+  const view = { x: 0, y: 0, scale: 1 };
+  const panState = { dragging:false, startX:0, startY:0, originX:0, originY:0 };
+
+  let data = defaultData();
+
+  function defaultData(){
+    return {
+      meta: { baseTravelSpeed: 120 },
+      resources: [
+        { id:'wood', name:'Wood' },
+        { id:'iron', name:'Iron Ore' },
+        { id:'herbs', name:'Herbs' }
+      ],
+      goods: [
+        { id:'tools', name:'Tools' },
+        { id:'weapons', name:'Weapons' },
+        { id:'rations', name:'Rations' }
+      ],
+      guilds: [
+        { id:'adventurers', name:'Adventurers Guild' },
+        { id:'miners', name:'Miners Guild' }
+      ],
+      enemyTypes: [
+        { id:'goblins', name:'Goblins' },
+        { id:'wolves', name:'Wolves' },
+        { id:'skeletons', name:'Skeletons' }
+      ],
+      locations: [
+        {
+          id:'loc1',
+          name:'Guild Hall',
+          desc:'Main guild headquarters.',
+          type:'city',
+          x:1500,
+          y:1000,
+          size:18,
+          region:'Heartlands',
+          speedMod:1,
+          danger:1,
+          guildId:'adventurers',
+          resources:{ herbs:12 },
+          goods:{ rations:8 },
+          enemies:{},
+          manufactured:{},
+          tags:[]
+        },
+        {
+          id:'loc2',
+          name:'Darkwood',
+          desc:'A wild forest full of beasts.',
+          type:'wild',
+          x:1050,
+          y:820,
+          size:18,
+          region:'Frontier',
+          speedMod:0.9,
+          danger:4,
+          guildId:'',
+          resources:{ wood:40, herbs:15 },
+          goods:{},
+          enemies:{ wolves:3, goblins:2 },
+          manufactured:{},
+          tags:['forest']
+        },
+        {
+          id:'loc3',
+          name:'Bone Vault',
+          desc:'Collapsed catacombs with undead inside.',
+          type:'dungeon',
+          x:2050,
+          y:760,
+          size:20,
+          region:'Frontier',
+          speedMod:0.7,
+          danger:7,
+          guildId:'',
+          resources:{ iron:10 },
+          goods:{},
+          enemies:{ skeletons:5 },
+          manufactured:{},
+          tags:['undead']
+        }
+      ],
+      connections: [ ['loc1','loc2'], ['loc1','loc3'] ],
+      tradeRoutes: [
+        {
+          id:'tr1',
+          from:'loc1', to:'loc2',
+          goodId:'rations', capacity:25, days:2, danger:2,
+          notes:'Supply run to the frontier.'
+        }
+      ]
+    };
+  }
+
+  function createSvg(tag){ return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+  function deepClone(v){ return JSON.parse(JSON.stringify(v)); }
+  function randomChoice(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function distance(a,b){ const dx = a.x-b.x, dy = a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+
+  function generateUniqueId(prefix, collection){
+    let i = 1;
+    const ids = new Set(collection.map(item => item.id));
+    while (ids.has(prefix + i)) i++;
+    return prefix + i;
+  }
+
+  function locationById(id){ return data.locations.find(l => l.id === id) || null; }
+  function tradeRouteById(id){ return data.tradeRoutes.find(r => r.id === id) || null; }
+
+  function worldPoint(evt){
+    const rect = svg.getBoundingClientRect();
+    const sx = (evt.clientX - rect.left) * (WORLD_W / rect.width);
+    const sy = (evt.clientY - rect.top) * (WORLD_H / rect.height);
+    return {
+      x: (sx - view.x) / view.scale,
+      y: (sy - view.y) / view.scale
+    };
+  }
+
+  function snapPoint(p){
+    if (!els.snapEnabled.checked) return p;
+    const size = Math.max(1, Number(els.gridSize.value || 50));
+    return {
+      x: Math.round(p.x / size) * size,
+      y: Math.round(p.y / size) * size
+    };
+  }
+
+  function applyTransform(){
+    viewport.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.scale})`);
+  }
+
+  function setMode(m){
+    mode = m;
+    pendingLinkStart = null;
+    els.modeSelectBtn.classList.toggle('activeMode', m === 'select');
+    els.modeAddBtn.classList.toggle('activeMode', m === 'add');
+    els.modeConnectBtn.classList.toggle('activeMode', m === 'connect');
+    els.modeTradeBtn.classList.toggle('activeMode', m === 'trade');
+    els.modeDeleteLinkBtn.classList.toggle('activeMode', m === 'delete-link');
+  }
+
+  function ensureLocationShape(loc){
+    loc.name ??= 'New Location';
+    loc.desc ??= '';
+    loc.type ??= 'city';
+    loc.size ??= 18;
+    loc.region ??= 'Frontier';
+    loc.speedMod ??= 1;
+    loc.danger ??= 1;
+    loc.guildId ??= '';
+    loc.resources ??= {};
+    loc.goods ??= {};
+    loc.enemies ??= {};
+    loc.tags ??= [];
+  }
+
+  function refreshSelectors(){
+    const fillSelect = (select, defs, includeBlank) => {
+      const current = select.value;
+      select.innerHTML = '';
+      if (includeBlank){
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '(none)';
+        select.appendChild(blank);
+      }
+      defs.forEach(def => {
+        const opt = document.createElement('option');
+        opt.value = def.id;
+        opt.textContent = def.name;
+        select.appendChild(opt);
+      });
+      if ([...select.options].some(o => o.value === current)) select.value = current;
+    };
+
+    fillSelect(els.resourceSelect, data.resources, false);
+    fillSelect(els.goodsSelect, data.goods, false);
+    fillSelect(els.enemySelect, data.enemyTypes, false);
+    fillSelect(els.propGuild, data.guilds, true);
+  }
+
+  function renderGrid(){
+    gridLayer.innerHTML = '';
+    if (!els.showGrid.checked) return;
+    const size = Math.max(10, Number(els.gridSize.value || 50));
+    for (let x = 0; x <= WORLD_W; x += size){
+      const line = createSvg('line');
+      line.setAttribute('class', 'grid-line');
+      line.setAttribute('x1', x);
+      line.setAttribute('y1', 0);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', WORLD_H);
+      gridLayer.appendChild(line);
+    }
+    for (let y = 0; y <= WORLD_H; y += size){
+      const line = createSvg('line');
+      line.setAttribute('class', 'grid-line');
+      line.setAttribute('x1', 0);
+      line.setAttribute('y1', y);
+      line.setAttribute('x2', WORLD_W);
+      line.setAttribute('y2', y);
+      gridLayer.appendChild(line);
+    }
+  }
+
+  function drawConnections(){
+    connectionsLayer.innerHTML = '';
+    data.connections.forEach((pair, idx) => {
+      const a = locationById(pair[0]);
+      const b = locationById(pair[1]);
+      if (!a || !b) return;
+      const line = createSvg('line');
+      let cls = 'connection';
+      if (selectedConnection && selectedConnection.kind === 'road' && selectedConnection.index === idx) cls += ' selected';
+      line.setAttribute('class', cls);
+      line.setAttribute('x1', a.x);
+      line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x);
+      line.setAttribute('y2', b.y);
+      line.addEventListener('click', evt => {
+        evt.stopPropagation();
+        selectedConnection = { kind:'road', index:idx };
+        selectedTradeRouteId = null;
+        render();
+      });
+      connectionsLayer.appendChild(line);
+    });
+  }
+
+  function drawTradeRoutes(){
+    tradeRoutesLayer.innerHTML = '';
+    data.tradeRoutes.forEach(route => {
+      const a = locationById(route.from);
+      const b = locationById(route.to);
+      if (!a || !b) return;
+      const line = createSvg('line');
+      let cls = 'trade-route';
+      if (selectedTradeRouteId === route.id) cls += ' selected';
+      line.setAttribute('class', cls);
+      line.setAttribute('x1', a.x);
+      line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x);
+      line.setAttribute('y2', b.y);
+      line.addEventListener('click', evt => {
+        evt.stopPropagation();
+        selectedTradeRouteId = route.id;
+        selectedConnection = null;
+        render();
+      });
+      tradeRoutesLayer.appendChild(line);
+
+      const label = createSvg('text');
+      label.setAttribute('class', 'route-label');
+      label.setAttribute('x', (a.x + b.x) / 2);
+      label.setAttribute('y', (a.y + b.y) / 2 - 8);
+      const good = data.goods.find(g => g.id === route.goodId);
+      label.textContent = `${good ? good.name : route.goodId} ${route.capacity}`;
+      tradeRoutesLayer.appendChild(label);
+    });
+  }
+
+  function drawLocations(){
+    locationsLayer.innerHTML = '';
+    overlayLayer.innerHTML = '';
+
+    data.locations.forEach(loc => {
+      ensureLocationShape(loc);
+      const g = createSvg('g');
+      let cls = `location ${loc.type}`;
+      if (selectedLocationId === loc.id) cls += ' selected';
+      g.setAttribute('class', cls);
+
+      const outer = createSvg('circle');
+      outer.setAttribute('class', 'outer');
+      outer.setAttribute('cx', loc.x);
+      outer.setAttribute('cy', loc.y);
+      outer.setAttribute('r', Number(loc.size || 18) + 6);
+
+      const core = createSvg('circle');
+      core.setAttribute('class', 'core');
+      core.setAttribute('cx', loc.x);
+      core.setAttribute('cy', loc.y);
+      core.setAttribute('r', Number(loc.size || 18));
+
+      const label = createSvg('text');
+      label.setAttribute('class', 'location-label');
+      label.setAttribute('x', loc.x);
+      label.setAttribute('y', loc.y + Number(loc.size || 18) + 18);
+      label.textContent = loc.name || loc.id;
+
+      g.appendChild(outer);
+      g.appendChild(core);
+      g.appendChild(label);
+      locationsLayer.appendChild(g);
+
+      if (loc.type === 'dungeon' || loc.type === 'wild'){
+        const danger = createSvg('text');
+        danger.setAttribute('class', 'location-label');
+        danger.setAttribute('x', loc.x);
+        danger.setAttribute('y', loc.y - Number(loc.size || 18) - 10);
+        danger.textContent = `D${loc.danger ?? 1}`;
+        overlayLayer.appendChild(danger);
+      }
+
+      if (quests.some(q => q.targetLocationId === loc.id)){
+        const quest = createSvg('circle');
+        quest.setAttribute('class', 'quest-marker');
+        quest.setAttribute('cx', loc.x + Number(loc.size || 18) + 8);
+        quest.setAttribute('cy', loc.y - Number(loc.size || 18) - 8);
+        quest.setAttribute('r', 6);
+        overlayLayer.appendChild(quest);
+      }
+
+      g.addEventListener('mousedown', evt => {
+        evt.stopPropagation();
+        if (mode === 'select'){
+          selectedLocationId = loc.id;
+          selectedConnection = null;
+          selectedTradeRouteId = null;
+          dragState = { kind:'location', id:loc.id };
+          loadSelectedLocation();
+          render();
+        }
+      });
+
+      g.addEventListener('click', evt => {
+        evt.stopPropagation();
+        if (mode === 'select'){
+          selectedLocationId = loc.id;
+          selectedConnection = null;
+          selectedTradeRouteId = null;
+          loadSelectedLocation();
+          render();
+          return;
+        }
+
+        if (mode === 'connect'){
+          handlePairAction(loc.id, 'road');
+          return;
+        }
+
+        if (mode === 'trade'){
+          handlePairAction(loc.id, 'trade');
+          return;
+        }
+
+        if (mode === 'delete-link'){
+          handlePairAction(loc.id, 'delete');
+        }
+      });
+    });
+  }
+
+  function handlePairAction(locationId, kind){
+    if (!pendingLinkStart){
+      pendingLinkStart = locationId;
+      selectedLocationId = locationId;
+      loadSelectedLocation();
+      render();
+      return;
+    }
+    if (pendingLinkStart === locationId){
+      pendingLinkStart = null;
+      render();
+      return;
+    }
+
+    if (kind === 'road'){
+      const exists = data.connections.some(c => (c[0] === pendingLinkStart && c[1] === locationId) || (c[0] === locationId && c[1] === pendingLinkStart));
+      if (!exists) data.connections.push([pendingLinkStart, locationId]);
+    } else if (kind === 'trade'){
+      const routeId = generateUniqueId('tr', data.tradeRoutes);
+      data.tradeRoutes.push({
+        id: routeId,
+        from: pendingLinkStart,
+        to: locationId,
+        goodId: data.goods[0]?.id || '',
+        capacity: 20,
+        days: Math.max(1, Math.round(distance(locationById(pendingLinkStart), locationById(locationId)) / 150)),
+        danger: Math.round(((locationById(pendingLinkStart)?.danger || 1) + (locationById(locationId)?.danger || 1)) / 2),
+        notes: ''
+      });
+    } else if (kind === 'delete'){
+      data.connections = data.connections.filter(c => !((c[0] === pendingLinkStart && c[1] === locationId) || (c[0] === locationId && c[1] === pendingLinkStart)));
+      data.tradeRoutes = data.tradeRoutes.filter(r => !((r.from === pendingLinkStart && r.to === locationId) || (r.from === locationId && r.to === pendingLinkStart)));
+    }
+
+    pendingLinkStart = null;
+    render();
+  }
+
+  function loadSelectedLocation(){
+    const loc = locationById(selectedLocationId);
+    if (!loc){
+      els.propId.value = '';
+      els.propName.value = '';
+      els.propDesc.value = '';
+      return;
+    }
+    ensureLocationShape(loc);
+    els.propId.value = loc.id;
+    els.propName.value = loc.name || '';
+    els.propDesc.value = loc.desc || '';
+    els.propType.value = loc.type || 'city';
+    els.propRegion.value = loc.region || '';
+    els.propX.value = Math.round(loc.x);
+    els.propY.value = Math.round(loc.y);
+    els.propSize.value = Number(loc.size || 18);
+    els.propSpeedMod.value = Number(loc.speedMod || 1);
+    els.propDanger.value = Number(loc.danger || 1);
+    els.propGuild.value = loc.guildId || '';
+    renderDefinitionList(els.resourceList, loc.resources, data.resources, 'resource');
+    renderDefinitionList(els.goodsList, loc.goods, data.goods, 'goods');
+    renderDefinitionList(els.enemyList, loc.enemies, data.enemyTypes, 'enemy');
+  }
+
+  function renderDefinitionList(container, map, defs, kind){
+    container.innerHTML = '';
+    const keys = Object.keys(map || {});
+    if (!keys.length){
+      container.innerHTML = '<div class="mini">Nothing added.</div>';
+      return;
+    }
+    keys.forEach(id => {
+      const def = defs.find(d => d.id === id);
+      const row = document.createElement('div');
+      row.className = 'row';
+      const label = document.createElement('div');
+      label.textContent = `${def ? def.name : id}: ${map[id]}`;
+      const remove = document.createElement('button');
+      remove.textContent = 'Remove';
+      remove.onclick = () => {
+        const loc = locationById(selectedLocationId);
+        if (!loc) return;
+        delete loc[kind === 'resource' ? 'resources' : kind === 'goods' ? 'goods' : 'enemies'][id];
+        loadSelectedLocation();
+        render();
+      };
+      row.appendChild(label);
+      row.appendChild(remove);
+      container.appendChild(row);
+    });
+  }
+
+  function addLocation(point){
+    const p = snapPoint(point);
+    const id = generateUniqueId('loc', data.locations);
+    data.locations.push({
+      id,
+      name: `New ${els.addType.value}`,
+      desc: '',
+      type: els.addType.value,
+      x: p.x,
+      y: p.y,
+      size: Math.max(8, Number(els.addSize.value || 18)),
+      region: els.addRegion.value || 'Frontier',
+      speedMod: Math.max(0.2, Number(els.addSpeedMod.value || 1)),
+      danger: els.addType.value === 'city' ? 1 : els.addType.value === 'wild' ? 3 : 6,
+      guildId: '',
+      resources: {},
+      goods: {},
+      enemies: {},
+      tags: []
+    });
+    selectedLocationId = id;
+    loadSelectedLocation();
+    render();
+  }
+
+  function applySelectedLocationProps(){
+    const loc = locationById(selectedLocationId);
+    if (!loc) return;
+    loc.name = els.propName.value || loc.id;
+    loc.desc = els.propDesc.value || '';
+    loc.type = els.propType.value;
+    loc.region = els.propRegion.value || 'Frontier';
+    loc.x = Number(els.propX.value || loc.x);
+    loc.y = Number(els.propY.value || loc.y);
+    if (els.snapEnabled.checked){
+      const p = snapPoint({ x: loc.x, y: loc.y });
+      loc.x = p.x;
+      loc.y = p.y;
+    }
+    loc.size = Math.max(8, Number(els.propSize.value || 18));
+    loc.speedMod = Math.max(0.2, Number(els.propSpeedMod.value || 1));
+    loc.danger = clamp(Number(els.propDanger.value || 1), 0, 10);
+    loc.guildId = els.propGuild.value || '';
+    render();
+    loadSelectedLocation();
+  }
+
+  function deleteSelectedNode(){
+    if (!selectedLocationId) return;
+    data.locations = data.locations.filter(l => l.id !== selectedLocationId);
+    data.connections = data.connections.filter(c => c[0] !== selectedLocationId && c[1] !== selectedLocationId);
+    data.tradeRoutes = data.tradeRoutes.filter(r => r.from !== selectedLocationId && r.to !== selectedLocationId);
+    quests = quests.filter(q => q.targetLocationId !== selectedLocationId && q.originLocationId !== selectedLocationId);
+    selectedLocationId = null;
+    render();
+    loadSelectedLocation();
+    renderQuestList();
+  }
+
+  function duplicateSelectedNode(){
+    const loc = locationById(selectedLocationId);
+    if (!loc) return;
+    const copy = deepClone(loc);
+    copy.id = generateUniqueId('loc', data.locations);
+    copy.name = loc.name + ' Copy';
+    copy.x += 80;
+    copy.y += 80;
+    data.locations.push(copy);
+    selectedLocationId = copy.id;
+    loadSelectedLocation();
+    render();
+  }
+
+  function addDefinition(collectionKey, id, name){
+    id = (id || '').trim();
+    name = (name || '').trim();
+    if (!id || !name) return false;
+    const collection = data[collectionKey];
+    if (collection.some(item => item.id === id)) return false;
+    collection.push({ id, name });
+    refreshSelectors();
+    return true;
+  }
+
+  function addInventoryItem(kind){
+    const loc = locationById(selectedLocationId);
+    if (!loc) return;
+    if (kind === 'resource'){
+      const id = els.resourceSelect.value;
+      const amount = Number(els.resourceAmount.value || 0);
+      if (!id || !amount) return;
+      loc.resources[id] = (loc.resources[id] || 0) + amount;
+    } else if (kind === 'goods'){
+      const id = els.goodsSelect.value;
+      const amount = Number(els.goodsAmount.value || 0);
+      if (!id || !amount) return;
+      loc.goods[id] = (loc.goods[id] || 0) + amount;
+    } else if (kind === 'enemy'){
+      const id = els.enemySelect.value;
+      const amount = Number(els.enemyWeight.value || 0);
+      if (!id || !amount) return;
+      loc.enemies[id] = (loc.enemies[id] || 0) + amount;
+    }
+    loadSelectedLocation();
+    render();
+  }
+
+  function fitView(){
+    if (!data.locations.length){
+      view.x = 0; view.y = 0; view.scale = 1; applyTransform(); return;
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    data.locations.forEach(loc => {
+      minX = Math.min(minX, loc.x - (loc.size || 18) - 40);
+      minY = Math.min(minY, loc.y - (loc.size || 18) - 40);
+      maxX = Math.max(maxX, loc.x + (loc.size || 18) + 40);
+      maxY = Math.max(maxY, loc.y + (loc.size || 18) + 40);
+    });
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const sx = WORLD_W / Math.max(1, width);
+    const sy = WORLD_H / Math.max(1, height);
+    view.scale = clamp(Math.min(sx, sy) * 0.8, 0.2, 2.5);
+    view.x = -minX * view.scale + (WORLD_W - width * view.scale) / 2;
+    view.y = -minY * view.scale + (WORLD_H - height * view.scale) / 2;
+    applyTransform();
+  }
+
+  function exportJSON(){
+    data.meta.baseTravelSpeed = Number(els.baseTravelSpeed.value || 120);
+    jsonBox.value = JSON.stringify(data, null, 2);
+  }
+
+  function importJSON(){
+    try{
+      const parsed = JSON.parse(jsonBox.value);
+      if (!parsed.locations || !parsed.connections) throw new Error('Missing core fields');
+      parsed.resources ??= [];
+      parsed.goods ??= [];
+      parsed.guilds ??= [];
+      parsed.enemyTypes ??= [];
+      parsed.tradeRoutes ??= [];
+      parsed.meta ??= { baseTravelSpeed: 120 };
+      parsed.locations.forEach(ensureLocationShape);
+      const seen = new Set();
+      parsed.locations.forEach(loc => {
+        if (!loc.id || seen.has(loc.id)) loc.id = generateUniqueId('loc', parsed.locations.filter(x => x !== loc));
+        seen.add(loc.id);
+      });
+      data = parsed;
+      els.baseTravelSpeed.value = Number(data.meta.baseTravelSpeed || 120);
+      selectedLocationId = data.locations[0]?.id || null;
+      refreshSelectors();
+      loadSelectedLocation();
+      render();
+    } catch(err){
+      alert('Invalid JSON');
+    }
+  }
+
+  function questDifficultyScore(loc){
+    const enemyWeight = Object.values(loc.enemies || {}).reduce((a,b) => a + Number(b || 0), 0);
+    return (loc.danger || 1) + enemyWeight * 0.6 + (loc.type === 'dungeon' ? 2 : loc.type === 'wild' ? 1 : 0);
+  }
+
+  function generateQuests(){
+    quests = [];
+    const questCount = clamp(Number(els.questCount.value || 5), 1, 20);
+    const bias = els.questDifficultyBias.value;
+    const cities = data.locations.filter(l => l.type === 'city');
+    const wilderness = data.locations.filter(l => l.type === 'wild' || l.type === 'dungeon');
+    const guilds = data.guilds.length ? data.guilds : [{ id:'independent', name:'Independent Contractors' }];
+
+    if (!data.locations.length) return;
+
+    const weightedTargets = deepClone(wilderness.length ? wilderness : data.locations).sort((a,b) => questDifficultyScore(a) - questDifficultyScore(b));
+    let targets = weightedTargets;
+    if (bias === 'easy') targets = weightedTargets.slice(0, Math.max(1, Math.ceil(weightedTargets.length * 0.6)));
+    if (bias === 'hard') targets = weightedTargets.slice(Math.max(0, Math.floor(weightedTargets.length * 0.4)));
+
+    for (let i = 0; i < questCount; i++){
+      const origin = randomChoice(cities.length ? cities : data.locations);
+      const target = randomChoice(targets);
+      const guild = randomChoice(guilds);
+      const enemyIds = Object.keys(target.enemies || {});
+      const resourceIds = Object.keys(target.resources || {});
+      const goodsIds = Object.keys(target.goods || {});
+      const typeRoll = randomChoice(['hunt','clear','escort','recover','deliver','survey']);
+
+      let title = 'Contract';
+      let summary = '';
+      let rewards = [];
+      const difficulty = Math.max(1, Math.round(questDifficultyScore(target)));
+
+      if ((typeRoll === 'hunt' || typeRoll === 'clear') && enemyIds.length){
+        const enemyId = randomChoice(enemyIds);
+        const enemy = data.enemyTypes.find(e => e.id === enemyId);
+        title = typeRoll === 'hunt' ? `Hunt ${enemy?.name || enemyId}` : `Clear ${target.name}`;
+        summary = `${guild.name} wants the threat at ${target.name} reduced. Primary hostiles: ${enemy?.name || enemyId}.`;
+        rewards = [`${difficulty * 20} gold`, `${difficulty} reputation`];
+      } else if (typeRoll === 'recover' && (resourceIds.length || goodsIds.length)){
+        const pickGoods = goodsIds.length && (!resourceIds.length || Math.random() > 0.5);
+        const id = pickGoods ? randomChoice(goodsIds) : randomChoice(resourceIds);
+        const def = pickGoods ? data.goods.find(g => g.id === id) : data.resources.find(r => r.id === id);
+        title = `Recover ${def?.name || id}`;
+        summary = `Bring back a cache of ${def?.name || id} from ${target.name}. Expect resistance.`;
+        rewards = [`${difficulty * 18} gold`, `${Math.max(1, Math.floor(difficulty / 2))} crafting mats`];
+      } else if (typeRoll === 'deliver' && cities.length > 1){
+        const other = randomChoice(cities.filter(c => c.id !== origin.id) || [origin]);
+        const goodsPool = data.goods.length ? data.goods : [{ id:'supplies', name:'Supplies' }];
+        const good = randomChoice(goodsPool);
+        title = `Deliver ${good.name}`;
+        summary = `Move ${good.name} from ${origin.name} to ${other.name} without losing the shipment.`;
+        rewards = [`${difficulty * 15} gold`, 'merchant favor'];
+      } else if (typeRoll === 'survey'){
+        title = `Survey ${target.name}`;
+        summary = `Map routes, note hazards, and report resource finds around ${target.name}.`;
+        rewards = [`${difficulty * 12} gold`, 'map intel'];
+      } else {
+        title = `Escort to ${target.name}`;
+        summary = `Escort a convoy from ${origin.name} toward ${target.name}. Danger level is estimated at ${difficulty}.`;
+        rewards = [`${difficulty * 16} gold`, `${Math.max(1, Math.floor(difficulty / 2))} guild favor`];
+      }
+
+      quests.push({
+        id: `q${i+1}`,
+        title,
+        summary,
+        guildId: guild.id,
+        guildName: guild.name,
+        originLocationId: origin.id,
+        targetLocationId: target.id,
+        danger: difficulty,
+        rewards
+      });
+    }
+
+    renderQuestList();
+    render();
+  }
+
+  function renderQuestList(){
+    els.questList.innerHTML = '';
+    if (!quests.length){
+      els.questList.innerHTML = '<div class="mini">No quests generated yet.</div>';
+      return;
+    }
+    quests.forEach(q => {
+      const card = document.createElement('div');
+      card.className = 'entry';
+      card.innerHTML = `
+        <div class="entry-title">${q.title}</div>
+        <div class="entry-sub">${q.guildName} • Danger ${q.danger}</div>
+        <div style="margin:6px 0 8px 0; font-size:13px; line-height:1.4;">${q.summary}</div>
+        <div class="mini">Rewards: ${q.rewards.join(', ')}</div>
+      `;
+      els.questList.appendChild(card);
+    });
+  }
+
+  function render(){
+    renderGrid();
+    applyTransform();
+    drawConnections();
+    drawTradeRoutes();
+    drawLocations();
+  }
+
+  svg.addEventListener('mousedown', evt => {
+    const point = worldPoint(evt);
+
+    if (evt.target.closest('.location') || evt.target.closest('.connection') || evt.target.closest('.trade-route')) return;
+
+    if (mode === 'add'){
+      addLocation(point);
+      return;
+    }
+
+    if (mode === 'select'){
+      selectedConnection = null;
+      selectedTradeRouteId = null;
+      selectedLocationId = null;
+      pendingLinkStart = null;
+      panState.dragging = true;
+      svg.classList.add('dragging');
+      panState.startX = evt.clientX;
+      panState.startY = evt.clientY;
+      panState.originX = view.x;
+      panState.originY = view.y;
+      loadSelectedLocation();
+      render();
+    }
+  });
+
+  window.addEventListener('mousemove', evt => {
+    const point = snapPoint(worldPoint(evt));
+
+    if (dragState && dragState.kind === 'location'){
+      const loc = locationById(dragState.id);
+      if (loc){
+        loc.x = point.x;
+        loc.y = point.y;
+        if (selectedLocationId === loc.id) loadSelectedLocation();
+        render();
+      }
+    }
+
+    if (panState.dragging){
+      const rect = svg.getBoundingClientRect();
+      const dx = (evt.clientX - panState.startX) * (WORLD_W / rect.width);
+      const dy = (evt.clientY - panState.startY) * (WORLD_H / rect.height);
+      view.x = panState.originX + dx;
+      view.y = panState.originY + dy;
+      applyTransform();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragState = null;
+    panState.dragging = false;
+    svg.classList.remove('dragging');
+  });
+
+  svg.addEventListener('wheel', evt => {
+    evt.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (evt.clientX - rect.left) * (WORLD_W / rect.width);
+    const mouseY = (evt.clientY - rect.top) * (WORLD_H / rect.height);
+    const worldX = (mouseX - view.x) / view.scale;
+    const worldY = (mouseY - view.y) / view.scale;
+    if (evt.deltaY < 0) view.scale *= 1.1; else view.scale *= 0.9;
+    view.scale = clamp(view.scale, 0.2, 4);
+    view.x = mouseX - worldX * view.scale;
+    view.y = mouseY - worldY * view.scale;
+    applyTransform();
+  }, { passive:false });
+
+  els.modeSelectBtn.addEventListener('click', () => setMode('select'));
+  els.modeAddBtn.addEventListener('click', () => setMode('add'));
+  els.modeConnectBtn.addEventListener('click', () => setMode('connect'));
+  els.modeTradeBtn.addEventListener('click', () => setMode('trade'));
+  els.modeDeleteLinkBtn.addEventListener('click', () => setMode('delete-link'));
+  els.resetViewBtn.addEventListener('click', () => { view.x = 0; view.y = 0; view.scale = 1; applyTransform(); });
+  els.fitViewBtn.addEventListener('click', fitView);
+  els.duplicateNodeBtn.addEventListener('click', duplicateSelectedNode);
+  els.deleteNodeBtn.addEventListener('click', deleteSelectedNode);
+  els.applyPropsBtn.addEventListener('click', applySelectedLocationProps);
+  els.addResourceBtn.addEventListener('click', () => addInventoryItem('resource'));
+  els.addGoodsBtn.addEventListener('click', () => addInventoryItem('goods'));
+  els.addEnemyBtn.addEventListener('click', () => addInventoryItem('enemy'));
+  els.showGrid.addEventListener('change', render);
+  els.gridSize.addEventListener('change', render);
+  els.generateQuestsBtn.addEventListener('click', generateQuests);
+  els.clearQuestsBtn.addEventListener('click', () => { quests = []; renderQuestList(); render(); });
+  els.exportBtn.addEventListener('click', exportJSON);
+  els.importBtn.addEventListener('click', importJSON);
+
+  els.addResourceTypeBtn.addEventListener('click', () => {
+    if (addDefinition('resources', els.newResourceId.value, els.newResourceName.value)){
+      els.newResourceId.value = ''; els.newResourceName.value = ''; render();
+    }
+  });
+  els.addGoodsTypeBtn.addEventListener('click', () => {
+    if (addDefinition('goods', els.newGoodsId.value, els.newGoodsName.value)){
+      els.newGoodsId.value = ''; els.newGoodsName.value = ''; render();
+    }
+  });
+  els.addGuildTypeBtn.addEventListener('click', () => {
+    if (addDefinition('guilds', els.newGuildId.value, els.newGuildName.value)){
+      els.newGuildId.value = ''; els.newGuildName.value = ''; render();
+    }
+  });
+  els.addEnemyTypeBtn.addEventListener('click', () => {
+    if (addDefinition('enemyTypes', els.newEnemyId.value, els.newEnemyName.value)){
+      els.newEnemyId.value = ''; els.newEnemyName.value = ''; render();
+    }
+  });
+
+  refreshSelectors();
+  els.baseTravelSpeed.value = Number(data.meta.baseTravelSpeed || 120);
+  selectedLocationId = data.locations[0]?.id || null;
+  loadSelectedLocation();
+  setMode('select');
+  render();
+  renderQuestList();
+  exportJSON();
+})();
+</script>
+</body>
+</html>
