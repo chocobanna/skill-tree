@@ -1,0 +1,197 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Extracted Visual Style Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+  --bg1:#090b11;
+  --bg2:#111624;
+
+  --panel:rgba(10,14,20,0.94);
+  --panel-border:rgba(255,215,140,0.12);
+
+  --text:#e8dcc0;
+  --muted:#a89b82;
+
+  --line:rgba(150,140,120,0.24);
+  --line-strong:rgba(255,196,92,0.8);
+
+  --node-fill:#1c2433;
+  --node-stroke:#8b7550;
+  --node-selected:#fff0c6;
+
+  --city:#5f92ff;
+  --wild:#56745b;
+  --dungeon:#a34f4f;
+
+  --quest:#ffe9a6;
+  --danger:#ff8a8a;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  color:var(--text);
+
+  background:
+    radial-gradient(circle at center, rgba(255,190,80,0.05) 0%, transparent 18%),
+    radial-gradient(circle at center, #151a25 0%, #0e121b 35%, #07090e 100%);
+}
+
+/* PANEL */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:12px;
+  padding:16px;
+  box-shadow:0 8px 30px rgba(0,0,0,0.35);
+  backdrop-filter:blur(6px);
+}
+
+/* INPUTS */
+input,button,select{
+  background:linear-gradient(180deg,#1b2331,#101620);
+  color:var(--text);
+  border:1px solid rgba(255,215,140,0.16);
+  border-radius:8px;
+  padding:8px 10px;
+}
+
+select{
+  background:#2a2f3a;
+}
+
+option{
+  background:#151a25;
+  color:#e8dcc0;
+}
+
+button:hover{
+  filter:brightness(1.08);
+  cursor:pointer;
+}
+
+h2{
+  margin-top:0;
+  letter-spacing:0.08em;
+}
+
+/* MAP STUFF */
+svg{
+  width:100%;
+  height:350px;
+  border:1px solid rgba(255,215,140,0.08);
+  margin-top:10px;
+}
+
+/* connections */
+.connection{
+  stroke:var(--line);
+  stroke-width:4;
+}
+
+.connection.selected{
+  stroke:var(--line-strong);
+  stroke-width:5;
+}
+
+/* nodes */
+.location .outer{
+  fill:rgba(10,12,18,0.95);
+  stroke:rgba(255,213,129,0.18);
+  stroke-width:2;
+}
+
+.location .core{
+  fill:var(--node-fill);
+  stroke:var(--node-stroke);
+  stroke-width:2;
+}
+
+.location.city .core{
+  fill:#1d2f52;
+  stroke:var(--city);
+}
+
+.location.wild .core{
+  fill:#1f3022;
+  stroke:var(--wild);
+}
+
+.location.dungeon .core{
+  fill:#351d20;
+  stroke:var(--dungeon);
+}
+
+.location-label{
+  fill:#d9ceb6;
+  font-size:12px;
+  text-anchor:middle;
+}
+</style>
+</head>
+
+<body>
+
+<div style="max-width:1100px;margin:auto;padding:30px">
+
+<div class="panel">
+<h2>UI Style Demo</h2>
+
+<p style="color:var(--muted)">
+This file previews the extracted visual style: panels, controls, map nodes, and connections.
+</p>
+
+<div style="display:flex;gap:10px;margin-bottom:10px">
+<button>Primary Button</button>
+<button>Another Button</button>
+<input placeholder="Input field">
+<select>
+<option>Option</option>
+<option>Option</option>
+</select>
+</div>
+
+</div>
+
+
+<div class="panel" style="margin-top:20px">
+<h2>Map Style Preview</h2>
+
+<svg viewBox="0 0 800 350">
+
+<line class="connection" x1="200" y1="180" x2="400" y2="120"/>
+<line class="connection selected" x1="400" y1="120" x2="600" y2="200"/>
+
+<g class="location city">
+<circle class="outer" cx="200" cy="180" r="24"/>
+<circle class="core" cx="200" cy="180" r="18"/>
+<text class="location-label" x="200" y="220">City</text>
+</g>
+
+<g class="location wild">
+<circle class="outer" cx="400" cy="120" r="24"/>
+<circle class="core" cx="400" cy="120" r="18"/>
+<text class="location-label" x="400" y="160">Wild</text>
+</g>
+
+<g class="location dungeon">
+<circle class="outer" cx="600" cy="200" r="24"/>
+<circle class="core" cx="600" cy="200" r="18"/>
+<text class="location-label" x="600" y="240">Dungeon</text>
+</g>
+
+</svg>
+
+</div>
+
+</div>
+
+</body>
+</html>
