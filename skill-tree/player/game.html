@@ -392,11 +392,43 @@
     right:12px;
     z-index:50;
   }
+
+  #worldMap{
+    width:100%;
+    height:100%;
+    background:
+      radial-gradient(circle at center,#162030,#0a0f18);
+  }
+
+  .location{
+    cursor:pointer;
+  }
+
+  .location circle{
+    fill:#24344d;
+    stroke:#ffe0a0;
+    stroke-width:2;
+  }
+
+  .location text{
+    fill:#ffe8b0;
+    font-size:14px;
+    text-anchor:middle;
+    pointer-events:none;
+  }
+
+  .map-path{
+    stroke:#8aa0c0;
+    stroke-width:3;
+  }
 </style>
 </head>
 <body>
 <button id="openSkillTreeBtn" class="skilltree-btn">
   Open Skill Tree
+</button>
+<button id="openWorldMapBtn" class="skilltree-btn" style="top:60px;">
+World Map
 </button>
 <div id="skillTreeMenu" class="skilltree-menu hidden">
 
@@ -448,6 +480,22 @@
     </div>
   </div>
 </div>
+<div id="worldMapMenu" class="skilltree-menu hidden">
+
+  <div class="skilltree-window">
+
+    <button id="closeWorldMapBtn" class="skilltree-close">X</button>
+
+    <svg id="worldMap" viewBox="0 0 3000 2000">
+      <g id="mapViewport">
+        <g id="mapConnections"></g>
+        <g id="mapLocations"></g>
+      </g>
+    </svg>
+
+  </div>
+
+</div>
 <script>
 (function(){
   const svg = document.getElementById("tree");
@@ -490,6 +538,73 @@
   let originX = 0;
   let originY = 0;
 
+  const worldMap = document.getElementById("worldMap");
+  const mapViewport = document.getElementById("mapViewport");
+
+  const mapView = {
+    x:0,
+    y:0,
+    scale:1
+  };
+
+  let mapDragging = false;
+  let mapDragStartX = 0;
+  let mapDragStartY = 0;
+  let mapOriginX = 0;
+  let mapOriginY = 0;
+
+  const locations = [
+    {id:"guild", name:"Guild Hall", x:1500, y:1000, type:"city"},
+    {id:"forest", name:"Dark Forest", x:900, y:700, type:"wild"},
+    {id:"ruins", name:"Ancient Ruins", x:2200, y:650, type:"dungeon"},
+    {id:"swamp", name:"Black Swamp", x:1100, y:1400, type:"wild"},
+    {id:"peak", name:"Frost Peak", x:2100, y:1500, type:"dungeon"},
+    {id:"village", name:"River Village", x:700, y:1000, type:"city"},
+    {id:"crypt", name:"Forgotten Crypt", x:2600, y:900, type:"dungeon"},
+  ];
+
+  const mapConnections = [
+    ["guild","forest"],
+    ["guild","village"],
+    ["forest","swamp"],
+    ["forest","ruins"],
+    ["ruins","crypt"],
+    ["swamp","peak"],
+  ];
+
+  const player = {
+    location: "guild",
+    speed: 120,   // units per hour
+    traveling: false
+  };
+
+  function distance(a,b){
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  function travelTime(a,b){
+    const dist = distance(a,b);
+    return dist / player.speed;
+  }
+  
+  function drawPlayer(){
+
+    const loc = locations.find(l=>l.id===player.location);
+
+    const circle = document.createElementNS(
+      "http://www.w3.org/2000/svg","circle"
+    );
+
+    circle.setAttribute("cx",loc.x);
+    circle.setAttribute("cy",loc.y);
+    circle.setAttribute("r",10);
+    circle.setAttribute("fill","#4cff9a");
+
+    document.getElementById("mapLocations").appendChild(circle);
+  }
+   
   function defaultData(){
     return {
       attributes: [],
@@ -514,6 +629,68 @@
       ],
       connections: []
     };
+  }
+
+  function applyMapTransform(){
+    mapViewport.setAttribute(
+      "transform",
+      `translate(${mapView.x} ${mapView.y}) scale(${mapView.scale})`
+    );
+  }
+
+  function renderWorldMap(){
+
+    const locLayer = document.getElementById("mapLocations");
+    const connLayer = document.getElementById("mapConnections");
+
+    locLayer.innerHTML="";
+    connLayer.innerHTML="";
+
+    const locMap = {};
+    locations.forEach(l=>locMap[l.id]=l);
+
+    // draw connections
+    mapConnections.forEach(([a,b])=>{
+      const A = locMap[a];
+      const B = locMap[b];
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1",A.x);
+      line.setAttribute("y1",A.y);
+      line.setAttribute("x2",B.x);
+      line.setAttribute("y2",B.y);
+      line.setAttribute("class","map-path");
+
+      connLayer.appendChild(line);
+    });
+
+    locations.forEach(loc=>{
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+      g.setAttribute("class","location");
+
+      const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
+      circle.setAttribute("cx",loc.x);
+      circle.setAttribute("cy",loc.y);
+      circle.setAttribute("r",18);
+
+      // color by type
+      if(loc.type === "dungeon") circle.setAttribute("fill","#7a2b2b");
+      else if(loc.type === "city") circle.setAttribute("fill","#3a6cff");
+      else circle.setAttribute("fill","#24344d");
+
+      const label = document.createElementNS("http://www.w3.org/2000/svg","text");
+      label.setAttribute("x",loc.x);
+      label.setAttribute("y",loc.y+35);
+      label.textContent = loc.name;
+
+      g.appendChild(circle);
+      g.appendChild(label);
+
+      locLayer.appendChild(g);
+      
+    });
+    drawPlayer();
   }
 
   function nodeRadius(type){
@@ -1250,6 +1427,77 @@
     originY = view.y;
   });
 
+  worldMap.addEventListener("mousedown", (evt)=>{
+
+    mapDragging = true;
+
+    mapDragStartX = evt.clientX;
+    mapDragStartY = evt.clientY;
+
+    mapOriginX = mapView.x;
+    mapOriginY = mapView.y;
+
+  });
+
+  window.addEventListener("mousemove",(evt)=>{
+
+    if(!mapDragging) return;
+
+    const rect = worldMap.getBoundingClientRect();
+
+    const dx = (evt.clientX - mapDragStartX) * (3000 / rect.width);
+    const dy = (evt.clientY - mapDragStartY) * (2000 / rect.height);
+
+    mapView.x = mapOriginX + dx;
+    mapView.y = mapOriginY + dy;
+
+    applyMapTransform();
+
+  });
+
+  window.addEventListener("mouseup",()=>{
+    mapDragging = false;
+  });
+
+  worldMap.addEventListener("wheel",(e)=>{
+
+    e.preventDefault();
+
+    const rect = worldMap.getBoundingClientRect();
+
+    const mouseX = (e.clientX - rect.left) * (3000 / rect.width);
+    const mouseY = (e.clientY - rect.top) * (2000 / rect.height);
+
+    const worldX = (mouseX - mapView.x) / mapView.scale;
+    const worldY = (mouseY - mapView.y) / mapView.scale;
+
+    if(e.deltaY < 0) mapView.scale *= 1.1;
+    else mapView.scale *= 0.9;
+
+    if(mapView.scale < 0.3) mapView.scale = 0.3;
+    if(mapView.scale > 3) mapView.scale = 3;
+
+    mapView.x = mouseX - worldX * mapView.scale;
+    mapView.y = mouseY - worldY * mapView.scale;
+
+    applyMapTransform();
+
+  },{ passive:false });
+
+  document.getElementById("openWorldMapBtn").onclick = ()=>{
+
+    worldMapMenu.classList.remove("hidden");
+
+    mapView.x = 0;
+    mapView.y = 0;
+    mapView.scale = 1;
+
+    applyMapTransform();
+
+    renderWorldMap();
+
+  };
+  
   window.addEventListener("mousemove", function(evt){
     if (!dragging) return;
     const rect = svg.getBoundingClientRect();
@@ -1265,6 +1513,17 @@
     svg.classList.remove("dragging");
   });
 
+  const worldMapMenu = document.getElementById("worldMapMenu");
+
+  document.getElementById("openWorldMapBtn").onclick = ()=>{
+    worldMapMenu.classList.remove("hidden");
+    renderWorldMap();
+  };
+
+  document.getElementById("closeWorldMapBtn").onclick = ()=>{
+    worldMapMenu.classList.add("hidden");
+  };
+
   skillTreeMenu.addEventListener("click", (e) => {
 
     const windowEl = document.querySelector(".skilltree-window");
@@ -1274,6 +1533,12 @@
       skillTreeMenu.classList.add("hidden");
     }
 
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      skillTreeMenu.classList.add("hidden");
+    }
   });
 
   svg.addEventListener("wheel", function(e){
