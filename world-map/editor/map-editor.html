@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Node Map Editor</title>
+
+<style>
+:root{
+  --bg1:#090b11;
+  --bg2:#111624;
+  --panel:rgba(10,14,20,0.94);
+  --panel-border:rgba(255,215,140,0.12);
+  --text:#e8dcc0;
+  --line:rgba(150,140,120,0.24);
+  --line-strong:rgba(255,196,92,0.8);
+  --node-fill:#1c2433;
+  --node-stroke:#8b7550;
+  --city:#5f92ff;
+  --wild:#56745b;
+  --dungeon:#a34f4f;
+}
+
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#0e121b;
+  color:var(--text);
+}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:12px;
+  padding:12px;
+  margin:10px;
+}
+
+button,select{
+  padding:6px 10px;
+  border-radius:6px;
+  border:1px solid #444;
+  background:#1b2331;
+  color:white;
+}
+
+svg{
+  width:100%;
+  height:600px;
+  border:1px solid #333;
+}
+
+/* connections */
+
+.connection{
+  stroke:var(--line);
+  stroke-width:4;
+}
+
+.connection.selected{
+  stroke:var(--line-strong);
+  stroke-width:5;
+}
+
+/* nodes */
+
+.location .outer{
+  fill:rgba(10,12,18,0.95);
+  stroke:rgba(255,213,129,0.18);
+  stroke-width:2;
+}
+
+.location .core{
+  fill:var(--node-fill);
+  stroke:var(--node-stroke);
+  stroke-width:2;
+}
+
+.location.city .core{
+  fill:#1d2f52;
+  stroke:var(--city);
+}
+
+.location.wild .core{
+  fill:#1f3022;
+  stroke:var(--wild);
+}
+
+.location.dungeon .core{
+  fill:#351d20;
+  stroke:var(--dungeon);
+}
+
+.location-label{
+  fill:#d9ceb6;
+  font-size:12px;
+  text-anchor:middle;
+  pointer-events:none;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="panel">
+
+<button id="addNode">Create Node</button>
+
+<select id="nodeType">
+<option value="city">City</option>
+<option value="wild">Wild</option>
+<option value="dungeon">Dungeon</option>
+</select>
+
+<button id="connectMode">Connect Nodes</button>
+<button id="deleteConnection">Delete Connection</button>
+
+</div>
+
+<svg id="map"></svg>
+
+<script>
+
+const svg = document.getElementById("map")
+
+let nodes=[]
+let connections=[]
+let connectMode=false
+let selectedNode=null
+let selectedConnection=null
+
+document.getElementById("connectMode").onclick=()=>{
+  connectMode=!connectMode
+}
+
+document.getElementById("addNode").onclick=()=>{
+
+  const type=document.getElementById("nodeType").value
+
+  const x=100+Math.random()*500
+  const y=100+Math.random()*400
+
+  createNode(x,y,type,"Node "+nodes.length)
+
+}
+
+function createNode(x,y,type,label){
+
+  const g=document.createElementNS("http://www.w3.org/2000/svg","g")
+  g.classList.add("location",type)
+
+  const outer=document.createElementNS(svg.namespaceURI,"circle")
+  outer.setAttribute("cx",x)
+  outer.setAttribute("cy",y)
+  outer.setAttribute("r",24)
+  outer.setAttribute("class","outer")
+
+  const core=document.createElementNS(svg.namespaceURI,"circle")
+  core.setAttribute("cx",x)
+  core.setAttribute("cy",y)
+  core.setAttribute("r",18)
+  core.setAttribute("class","core")
+
+  const text=document.createElementNS(svg.namespaceURI,"text")
+  text.setAttribute("x",x)
+  text.setAttribute("y",y+40)
+  text.textContent=label
+  text.setAttribute("class","location-label")
+
+  g.appendChild(outer)
+  g.appendChild(core)
+  g.appendChild(text)
+
+  svg.appendChild(g)
+
+  const node={x,y,g}
+  nodes.push(node)
+
+  enableDrag(node)
+
+  g.onclick=(e)=>{
+    e.stopPropagation()
+
+    if(connectMode){
+
+      if(!selectedNode){
+        selectedNode=node
+      }else{
+
+        createConnection(selectedNode,node)
+        selectedNode=null
+      }
+
+    }
+  }
+
+}
+
+function createConnection(a,b){
+
+  const line=document.createElementNS(svg.namespaceURI,"line")
+
+  line.setAttribute("x1",a.x)
+  line.setAttribute("y1",a.y)
+  line.setAttribute("x2",b.x)
+  line.setAttribute("y2",b.y)
+  line.setAttribute("class","connection")
+
+  svg.insertBefore(line,svg.firstChild)
+
+  const conn={a,b,line}
+  connections.push(conn)
+
+  line.onclick=(e)=>{
+    e.stopPropagation()
+
+    if(selectedConnection)
+      selectedConnection.line.classList.remove("selected")
+
+    selectedConnection=conn
+    line.classList.add("selected")
+  }
+
+}
+
+function enableDrag(node){
+
+  let dragging=false
+
+  node.g.onmousedown=(e)=>{
+    dragging=true
+  }
+
+  svg.onmousemove=(e)=>{
+
+    if(!dragging) return
+
+    const rect=svg.getBoundingClientRect()
+
+    node.x=e.clientX-rect.left
+    node.y=e.clientY-rect.top
+
+    updateNode(node)
+    updateConnections()
+
+  }
+
+  window.onmouseup=()=>dragging=false
+
+}
+
+function updateNode(node){
+
+  node.g.querySelectorAll("circle").forEach(c=>{
+    c.setAttribute("cx",node.x)
+    c.setAttribute("cy",node.y)
+  })
+
+  node.g.querySelector("text").setAttribute("x",node.x)
+  node.g.querySelector("text").setAttribute("y",node.y+40)
+
+}
+
+function updateConnections(){
+
+  connections.forEach(c=>{
+    c.line.setAttribute("x1",c.a.x)
+    c.line.setAttribute("y1",c.a.y)
+    c.line.setAttribute("x2",c.b.x)
+    c.line.setAttribute("y2",c.b.y)
+  })
+
+}
+
+document.getElementById("deleteConnection").onclick=()=>{
+
+  if(!selectedConnection) return
+
+  selectedConnection.line.remove()
+
+  connections=connections.filter(c=>c!==selectedConnection)
+
+  selectedConnection=null
+
+}
+
+</script>
+
+</body>
+</html>
